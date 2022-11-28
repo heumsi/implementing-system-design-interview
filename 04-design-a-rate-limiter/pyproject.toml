@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "04-design-a-rate-limiter"
+version = "0.1.0"
+description = ""
+authors = ["heumsi <heumsi@naver.com>"]
+readme = "README.md"
+packages = [{include = "04_design_a_rate_limiter"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
