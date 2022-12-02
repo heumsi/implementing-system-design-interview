@@ -90,6 +90,6 @@ with socket.socket() as server_socket:
                 finally:
                     client_socket.close()
         except KeyboardInterrupt:
-            print("gracefully exit ...")
+            logger.info("gracefully exit ...")
             break
-print("good bye!")
+logger.info("good bye!")
