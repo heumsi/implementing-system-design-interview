@@ -10,7 +10,8 @@ FORWARD_PORT = 8080
 BUF_SIZE = 1024
 LOG_LEVEL = "DEBUG"
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-MAX_REQUESTS_PER_SECOND = 2
+PERIODIC_SECOND = 1
+MAX_REQUESTS_PER_PERIODIC_SECOND = 2
 
 logger = logging.getLogger()
 logger.setLevel(LOG_LEVEL)
@@ -19,7 +20,7 @@ stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 logger.addHandler(stream_handler)
 
 # this will be reset periodically in set_available()
-available = MAX_REQUESTS_PER_SECOND
+available = MAX_REQUESTS_PER_PERIODIC_SECOND
 
 
 def process(connection_socket, client_address):
@@ -50,8 +51,8 @@ def process(connection_socket, client_address):
 def set_available():
     while True:
         global available
-        available = MAX_REQUESTS_PER_SECOND
-        sleep(5)
+        available = MAX_REQUESTS_PER_PERIODIC_SECOND
+        sleep(PERIODIC_SECOND)
 
 
 with socket.socket() as server_socket:
