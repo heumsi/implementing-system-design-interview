@@ -62,11 +62,11 @@ with socket.socket() as server_socket:
     logger.info(f"start listening on {LISTEN_HOST}:{LISTEN_PORT}")
     while True:
         try:
-            connection_socket, client_address = server_socket.accept()
+            client_socket, client_address = server_socket.accept()
             if available > 0:
                 available -= 1
                 process_thread = threading.Thread(
-                    target=process, args=(connection_socket, client_address)
+                    target=process, args=(client_socket, client_address)
                 )
                 process_thread.start()
             else:
@@ -86,9 +86,9 @@ with socket.socket() as server_socket:
                         ]
                     )
                     data = "\n\n".join([header, content])
-                    connection_socket.send(data.encode("utf-8"))
+                    client_socket.send(data.encode("utf-8"))
                 finally:
-                    connection_socket.close()
+                    client_socket.close()
         except KeyboardInterrupt:
             print("gracefully exit ...")
             break
