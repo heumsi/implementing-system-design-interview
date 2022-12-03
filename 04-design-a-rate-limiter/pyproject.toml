@@ -8,8 +8,6 @@ packages = [{include = "04_design_a_rate_limiter"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = {extras = ["all"], version = "^0.88.0"}
-
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"
