@@ -5,13 +5,14 @@ import socket
 import threading
 from dataclasses import dataclass
 from time import sleep
-from typing import Dict, Tuple, List
+from typing import Dict, List, Tuple
 
 import yaml
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', help=' : config file path')
+parser.add_argument("-c", "--config", help=" : config file path")
 args = parser.parse_args()
+
 
 @dataclass
 class Config:
@@ -24,7 +25,7 @@ class Config:
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     periodic_second: int = 1
     max_requests_per_periodic_second: int = 2
-    
+
     @classmethod
     def from_dict(cls, config_as_dict: Dict[str, str]):
         return cls(**config_as_dict)
@@ -69,7 +70,9 @@ def process(client_socket, client_address):
                 f"start to connect forward server {config.forward_host}:{config.forward_port}"
             )
             forward_socket.connect((config.forward_host, config.forward_port))
-            logger.debug(f"send data to forward server {config.forward_host}:{config.forward_port}")
+            logger.debug(
+                f"send data to forward server {config.forward_host}:{config.forward_port}"
+            )
             forward_socket.send(data)
             data = forward_socket.recv(config.buf_size)
             decoded_data = data.decode()
@@ -122,7 +125,9 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, raise_gracefully)
 
     if not is_default_config:
-        set_config_periodically_thread = threading.Thread(target=set_config_periodically)
+        set_config_periodically_thread = threading.Thread(
+            target=set_config_periodically
+        )
         set_config_periodically_thread.start()
         core_threads.append(set_config_periodically_thread)
     with socket.socket() as server_socket:
