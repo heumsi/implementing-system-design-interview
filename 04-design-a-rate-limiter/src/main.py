@@ -69,44 +69,45 @@ def exit_gracefully(*args):
     raise GracefulExit()
 
 
-signal.signal(signal.SIGINT, exit_gracefully)
-signal.signal(signal.SIGTERM, exit_gracefully)
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, exit_gracefully)
+    signal.signal(signal.SIGTERM, exit_gracefully)
 
-with socket.socket() as server_socket:
-    set_available_thread = threading.Thread(target=set_available)
-    set_available_thread.start()
-    server_socket.bind((LISTEN_HOST, LISTEN_PORT))
-    server_socket.listen()
-    logger.info(f"start listening on {LISTEN_HOST}:{LISTEN_PORT}")
-    while True:
-        try:
-            client_socket, client_address = server_socket.accept()
-            if available > 0:
-                available -= 1
-                process_thread = threading.Thread(
-                    target=process, args=(client_socket, client_address)
-                )
-                process_thread.start()
-            else:
-                try:
-                    content = "Please retry after minutes"
-                    header = "\n".join(
-                        [
-                            "HTTP/1.1 429 Too many requests",
-                            "\n".join(
-                                f"{k}: {v}"
-                                for k, v in {
-                                    "Content-Type": "text/plan; encoding=utf8",
-                                    "Content-Length": len(content),
-                                    "Connection": "close",
-                                }.items()
-                            ),
-                        ]
+    with socket.socket() as server_socket:
+        set_available_thread = threading.Thread(target=set_available)
+        set_available_thread.start()
+        server_socket.bind((LISTEN_HOST, LISTEN_PORT))
+        server_socket.listen()
+        logger.info(f"start listening on {LISTEN_HOST}:{LISTEN_PORT}")
+        while True:
+            try:
+                client_socket, client_address = server_socket.accept()
+                if available > 0:
+                    available -= 1
+                    process_thread = threading.Thread(
+                        target=process, args=(client_socket, client_address)
                     )
-                    data = "\n\n".join([header, content])
-                    client_socket.send(data.encode("utf-8"))
-                finally:
-                    client_socket.close()
-        except GracefulExit:
-            break
-logger.info("good bye!")
+                    process_thread.start()
+                else:
+                    try:
+                        content = "Please retry after minutes"
+                        header = "\n".join(
+                            [
+                                "HTTP/1.1 429 Too many requests",
+                                "\n".join(
+                                    f"{k}: {v}"
+                                    for k, v in {
+                                        "Content-Type": "text/plan; encoding=utf8",
+                                        "Content-Length": len(content),
+                                        "Connection": "close",
+                                    }.items()
+                                ),
+                            ]
+                        )
+                        data = "\n\n".join([header, content])
+                        client_socket.send(data.encode("utf-8"))
+                    finally:
+                        client_socket.close()
+            except GracefulExit:
+                break
+    logger.info("good bye!")
