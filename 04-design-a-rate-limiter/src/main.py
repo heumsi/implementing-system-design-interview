@@ -1,4 +1,5 @@
 import logging
+import signal
 import socket
 import threading
 from time import sleep
@@ -12,6 +13,7 @@ LOG_LEVEL = "DEBUG"
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 PERIODIC_SECOND = 1
 MAX_REQUESTS_PER_PERIODIC_SECOND = 2
+GRACEFUL_EXIT_TIME_SECOND = 5
 
 logger = logging.getLogger()
 logger.setLevel(LOG_LEVEL)
@@ -55,6 +57,21 @@ def set_available():
         sleep(PERIODIC_SECOND)
 
 
+class GracefulExit(Exception):
+    pass
+
+
+def exit_gracefully(*args):
+    logger.info("gracefully exit ...")
+    for i in range(GRACEFUL_EXIT_TIME_SECOND, 0, -1):
+        logger.debug(f"Wait {i} seconds for threads to complete...")
+        sleep(1)
+    raise GracefulExit()
+
+
+signal.signal(signal.SIGINT, exit_gracefully)
+signal.signal(signal.SIGTERM, exit_gracefully)
+
 with socket.socket() as server_socket:
     set_available_thread = threading.Thread(target=set_available)
     set_available_thread.start()
@@ -90,7 +107,6 @@ with socket.socket() as server_socket:
                     client_socket.send(data.encode("utf-8"))
                 finally:
                     client_socket.close()
-        except KeyboardInterrupt:
-            logger.info("gracefully exit ...")
+        except GracefulExit:
             break
 logger.info("good bye!")
