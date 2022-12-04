@@ -12,7 +12,7 @@ class Config:
     log_level: str = "DEBUG"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     periodic_second: int = 1
-    max_requests_per_periodic_second: int = 2
+    max_n_tokens_per_periodic_second: int = 2
 
     @classmethod
     def from_dict(cls, config_as_dict: Dict[str, str]):

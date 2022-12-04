@@ -6,4 +6,4 @@ buf_size: 1024
 log_level: DEBUG
 log_format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 periodic_second: 1
-max_requests_per_periodic_second: 2
+max_n_tokens_per_periodic_second: 2

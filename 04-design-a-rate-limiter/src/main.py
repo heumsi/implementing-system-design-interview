@@ -69,7 +69,7 @@ def forward_request(client_socket, client_address):
             f"{k}: {v}"
             for k, v in {
                 "X-Ratelimit-Remaining": client_ip_to_n_tokens[client_address[0]],
-                "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
+                "X-Ratelimit-Limit": config.max_n_tokens_per_periodic_second,
                 "X-Ratelimit-Retry-After": config.periodic_second
             }.items()
         )
@@ -96,7 +96,7 @@ def respond_with_failure(client_socket, client_address):
                         "Content-Length": len(content),
                         "Connection": "close",
                         "X-Ratelimit-Remaining": client_ip_to_n_tokens[client_address[0]],
-                        "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
+                        "X-Ratelimit-Limit": config.max_n_tokens_per_periodic_second,
                         "X-Ratelimit-Retry-After": config.periodic_second
                     }.items()
                 ),
@@ -109,12 +109,11 @@ def respond_with_failure(client_socket, client_address):
         client_socket.close()
 
 
-def set_client_ip_to_n_tokens_periodically():
+def initialize_client_ip_to_n_tokens_periodically():
     while not graceful_exit:
         global client_ip_to_n_tokens
         with client_ip_to_n_tokens_lock:
-            for client_address in client_ip_to_n_tokens.keys():
-                client_ip_to_n_tokens[client_address] = config.max_requests_per_periodic_second
+            client_ip_to_n_tokens = defaultdict(lambda: config.max_n_tokens_per_periodic_second)
         sleep(config.periodic_second)
 
 
@@ -134,7 +133,7 @@ if is_default_config:
     logger.debug(f"config argument is not proivded. default config will be used")
 else:
     logger.debug(f"got config from {args.config}")
-client_ip_to_n_tokens = defaultdict(lambda: config.max_requests_per_periodic_second)
+client_ip_to_n_tokens = defaultdict(lambda: config.max_n_tokens_per_periodic_second)
 client_ip_to_n_tokens_lock = threading.Lock()
 graceful_exit = False
 core_threads: List[threading.Thread] = []
@@ -152,7 +151,7 @@ if __name__ == "__main__":
         set_config_periodically_thread.start()
         core_threads.append(set_config_periodically_thread)
     with socket.socket() as server_socket:
-        set_n_tokens_thread = threading.Thread(target=set_client_ip_to_n_tokens_periodically)
+        set_n_tokens_thread = threading.Thread(target=initialize_client_ip_to_n_tokens_periodically)
         set_n_tokens_thread.start()
         core_threads.append(set_n_tokens_thread)
 
