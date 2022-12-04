@@ -63,10 +63,19 @@ def forward_request(client_socket, client_address):
             logger.debug(
                 f"got data from forward server {config.forward_host}:{config.forward_port}: {decoded_data}"
             )
+        decoded_data_blocks = decoded_data.split("\r\n\r\n")
+        decoded_data_blocks[0] = decoded_data_blocks[0] + "\r\n" + "\r\n".join(
+            f"{k}: {v}"
+            for k, v in {
+                "X-Ratelimit-Remaining": available,
+                "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
+                "X-Ratelimit-Retry-After": config.periodic_second
+            }.items()
+        )
+        decoded_data = "\r\n\r\n".join(decoded_data_blocks)
+        data = decoded_data.encode('utf-8')
         logger.debug(f"send data to client {client_address[0]}{client_address[1]}")
-        sleep(10)
         client_socket.send(data)
-
     finally:
         client_socket.close()
         thread_id = threading.get_native_id()
@@ -79,12 +88,15 @@ def response_fail(client_socket):
         header = "\n".join(
             [
                 "HTTP/1.1 429 Too many requests",
-                "\n".join(
+                "\r\n".join(
                     f"{k}: {v}"
                     for k, v in {
                         "Content-Type": "text/plan; encoding=utf8",
                         "Content-Length": len(content),
                         "Connection": "close",
+                        "X-Ratelimit-Remaining": available,
+                        "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
+                        "X-Ratelimit-Retry-After": config.periodic_second
                     }.items()
                 ),
             ]
