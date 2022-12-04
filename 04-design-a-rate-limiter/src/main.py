@@ -68,7 +68,7 @@ def forward_request(client_socket, client_address):
         decoded_data_blocks[0] = decoded_data_blocks[0] + "\r\n" + "\r\n".join(
             f"{k}: {v}"
             for k, v in {
-                "X-Ratelimit-Remaining": client_ip_to_available[client_address[0]],
+                "X-Ratelimit-Remaining": client_ip_to_n_tokens[client_address[0]],
                 "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
                 "X-Ratelimit-Retry-After": config.periodic_second
             }.items()
@@ -95,7 +95,7 @@ def respond_with_failure(client_socket, client_address):
                         "Content-Type": "text/plan; encoding=utf8",
                         "Content-Length": len(content),
                         "Connection": "close",
-                        "X-Ratelimit-Remaining": client_ip_to_available[client_address[0]],
+                        "X-Ratelimit-Remaining": client_ip_to_n_tokens[client_address[0]],
                         "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
                         "X-Ratelimit-Retry-After": config.periodic_second
                     }.items()
@@ -109,12 +109,12 @@ def respond_with_failure(client_socket, client_address):
         client_socket.close()
 
 
-def set_client_ip_to_available_periodically():
+def set_client_ip_to_n_tokens_periodically():
     while not graceful_exit:
-        global client_ip_to_available
-        with client_ip_to_available_lock:
-            for client_address in client_ip_to_available.keys():
-                client_ip_to_available[client_address] = config.max_requests_per_periodic_second
+        global client_ip_to_n_tokens
+        with client_ip_to_n_tokens_lock:
+            for client_address in client_ip_to_n_tokens.keys():
+                client_ip_to_n_tokens[client_address] = config.max_requests_per_periodic_second
         sleep(config.periodic_second)
 
 
@@ -134,8 +134,8 @@ if is_default_config:
     logger.debug(f"config argument is not proivded. default config will be used")
 else:
     logger.debug(f"got config from {args.config}")
-client_ip_to_available = defaultdict(lambda: config.max_requests_per_periodic_second)
-client_ip_to_available_lock = threading.Lock()
+client_ip_to_n_tokens = defaultdict(lambda: config.max_requests_per_periodic_second)
+client_ip_to_n_tokens_lock = threading.Lock()
 graceful_exit = False
 core_threads: List[threading.Thread] = []
 process_threads: Dict[int, threading.Thread] = {}
@@ -152,9 +152,9 @@ if __name__ == "__main__":
         set_config_periodically_thread.start()
         core_threads.append(set_config_periodically_thread)
     with socket.socket() as server_socket:
-        set_available_thread = threading.Thread(target=set_client_ip_to_available_periodically)
-        set_available_thread.start()
-        core_threads.append(set_available_thread)
+        set_n_tokens_thread = threading.Thread(target=set_client_ip_to_n_tokens_periodically)
+        set_n_tokens_thread.start()
+        core_threads.append(set_n_tokens_thread)
 
         server_socket.bind((config.listen_host, config.listen_port))
         server_socket.listen()
@@ -163,9 +163,9 @@ if __name__ == "__main__":
             try:
                 client_socket, client_address = server_socket.accept()
                 client_ip = client_address[0]
-                if client_ip_to_available[client_ip] > 0:
-                    with client_ip_to_available_lock:
-                        client_ip_to_available[client_ip] -= 1
+                if client_ip_to_n_tokens[client_ip] > 0:
+                    with client_ip_to_n_tokens_lock:
+                        client_ip_to_n_tokens[client_ip] -= 1
                     process_thread = threading.Thread(
                         target=forward_request, args=(client_socket, client_address)
                     )
