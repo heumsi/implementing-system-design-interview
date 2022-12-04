@@ -3,6 +3,7 @@ import logging
 import signal
 import socket
 import threading
+from collections import defaultdict
 from time import sleep
 from typing import Dict, List, Tuple
 
@@ -82,7 +83,7 @@ def forward_request(client_socket, client_address):
         process_threads.pop(thread_id)
 
 
-def response_fail(client_socket, client_address):
+def respond_with_failure(client_socket, client_address):
     try:
         content = "Please retry after minutes"
         header = "\n".join(
@@ -102,12 +103,13 @@ def response_fail(client_socket, client_address):
             ]
         )
         data = "\n\n".join([header, content])
+        logger.debug(f"send failure response to client {client_address[0]}:{client_address[1]}")
         client_socket.send(data.encode("utf-8"))
     finally:
         client_socket.close()
 
 
-def set_available():
+def set_client_ip_to_available_periodically():
     while not graceful_exit:
         global client_ip_to_available
         with client_ip_to_available_lock:
@@ -120,7 +122,7 @@ class GracefulExit(Exception):
     pass
 
 
-def raise_gracefully(*args):
+def raise_graceful_exit(*args):
     global graceful_exit
     graceful_exit = True
     raise GracefulExit
@@ -132,7 +134,7 @@ if is_default_config:
     logger.debug(f"config argument is not proivded. default config will be used")
 else:
     logger.debug(f"got config from {args.config}")
-client_ip_to_available = {}
+client_ip_to_available = defaultdict(lambda: config.max_requests_per_periodic_second)
 client_ip_to_available_lock = threading.Lock()
 graceful_exit = False
 core_threads: List[threading.Thread] = []
@@ -140,8 +142,8 @@ process_threads: Dict[int, threading.Thread] = {}
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, raise_gracefully)
-    signal.signal(signal.SIGTERM, raise_gracefully)
+    signal.signal(signal.SIGINT, raise_graceful_exit)
+    signal.signal(signal.SIGTERM, raise_graceful_exit)
 
     if not is_default_config:
         set_config_periodically_thread = threading.Thread(
@@ -150,7 +152,7 @@ if __name__ == "__main__":
         set_config_periodically_thread.start()
         core_threads.append(set_config_periodically_thread)
     with socket.socket() as server_socket:
-        set_available_thread = threading.Thread(target=set_available)
+        set_available_thread = threading.Thread(target=set_client_ip_to_available_periodically)
         set_available_thread.start()
         core_threads.append(set_available_thread)
 
@@ -161,10 +163,6 @@ if __name__ == "__main__":
             try:
                 client_socket, client_address = server_socket.accept()
                 client_ip = client_address[0]
-
-                if client_ip not in client_ip_to_available:
-                    with client_ip_to_available_lock:
-                        client_ip_to_available[client_ip] = config.max_requests_per_periodic_second
                 if client_ip_to_available[client_ip] > 0:
                     with client_ip_to_available_lock:
                         client_ip_to_available[client_ip] -= 1
@@ -174,7 +172,7 @@ if __name__ == "__main__":
                     process_thread.start()
                     process_threads[process_thread.native_id] = process_thread
                 else:
-                    response_fail(client_socket, client_address)
+                    respond_with_failure(client_socket, client_address)
             except GracefulExit:
                 continue
         logger.info("exit gracefully...")
