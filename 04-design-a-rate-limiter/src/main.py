@@ -125,7 +125,7 @@ class GracefulExit(Exception):
 def raise_graceful_exit(*args):
     global graceful_exit
     graceful_exit = True
-    raise GracefulExit
+    raise GracefulExit()
 
 
 config, is_default_config = get_config()
@@ -180,6 +180,6 @@ if __name__ == "__main__":
             logger.debug(f"wait process thread {thread_id}...")
             thread.join()
         for thread in core_threads:
-            logger.debug(f"core thread {thread.native_id}...")
+            logger.debug(f"wait core thread {thread.native_id}...")
             thread.join()
     logger.info("good bye!")
