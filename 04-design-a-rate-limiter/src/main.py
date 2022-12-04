@@ -58,7 +58,7 @@ def get_logger() -> logging.Logger:
     return logger
 
 
-def process(client_socket, client_address):
+def forward_request(client_socket, client_address):
     try:
         with socket.socket() as forward_socket:
             data = client_socket.recv(config.buf_size)
@@ -89,6 +89,28 @@ def process(client_socket, client_address):
         process_threads.pop(thread_id)
 
 
+def response_fail(client_socket):
+    try:
+        content = "Please retry after minutes"
+        header = "\n".join(
+            [
+                "HTTP/1.1 429 Too many requests",
+                "\n".join(
+                    f"{k}: {v}"
+                    for k, v in {
+                        "Content-Type": "text/plan; encoding=utf8",
+                        "Content-Length": len(content),
+                        "Connection": "close",
+                    }.items()
+                ),
+            ]
+        )
+        data = "\n\n".join([header, content])
+        client_socket.send(data.encode("utf-8"))
+    finally:
+        client_socket.close()
+
+
 def set_available():
     while not graceful_exit:
         global available
@@ -101,7 +123,6 @@ class GracefulExit(Exception):
 
 
 def raise_gracefully(*args):
-    # raise GracefulExit
     global graceful_exit
     graceful_exit = True
     raise GracefulExit
@@ -144,30 +165,12 @@ if __name__ == "__main__":
                 if available > 0:
                     available -= 1
                     process_thread = threading.Thread(
-                        target=process, args=(client_socket, client_address)
+                        target=forward_request, args=(client_socket, client_address)
                     )
                     process_thread.start()
                     process_threads[process_thread.native_id] = process_thread
                 else:
-                    try:
-                        content = "Please retry after minutes"
-                        header = "\n".join(
-                            [
-                                "HTTP/1.1 429 Too many requests",
-                                "\n".join(
-                                    f"{k}: {v}"
-                                    for k, v in {
-                                        "Content-Type": "text/plan; encoding=utf8",
-                                        "Content-Length": len(content),
-                                        "Connection": "close",
-                                    }.items()
-                                ),
-                            ]
-                        )
-                        data = "\n\n".join([header, content])
-                        client_socket.send(data.encode("utf-8"))
-                    finally:
-                        client_socket.close()
+                    response_fail(client_socket)
             except GracefulExit:
                 continue
         logger.info("exit gracefully...")
