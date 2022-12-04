@@ -67,14 +67,14 @@ def forward_request(client_socket, client_address):
         decoded_data_blocks[0] = decoded_data_blocks[0] + "\r\n" + "\r\n".join(
             f"{k}: {v}"
             for k, v in {
-                "X-Ratelimit-Remaining": available,
+                "X-Ratelimit-Remaining": client_ip_to_available[client_address[0]],
                 "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
                 "X-Ratelimit-Retry-After": config.periodic_second
             }.items()
         )
         decoded_data = "\r\n\r\n".join(decoded_data_blocks)
         data = decoded_data.encode('utf-8')
-        logger.debug(f"send data to client {client_address[0]}{client_address[1]}")
+        logger.debug(f"send data to client {client_address[0]}:{client_address[1]}")
         client_socket.send(data)
     finally:
         client_socket.close()
@@ -82,7 +82,7 @@ def forward_request(client_socket, client_address):
         process_threads.pop(thread_id)
 
 
-def response_fail(client_socket):
+def response_fail(client_socket, client_address):
     try:
         content = "Please retry after minutes"
         header = "\n".join(
@@ -94,7 +94,7 @@ def response_fail(client_socket):
                         "Content-Type": "text/plan; encoding=utf8",
                         "Content-Length": len(content),
                         "Connection": "close",
-                        "X-Ratelimit-Remaining": available,
+                        "X-Ratelimit-Remaining": client_ip_to_available[client_address[0]],
                         "X-Ratelimit-Limit": config.max_requests_per_periodic_second,
                         "X-Ratelimit-Retry-After": config.periodic_second
                     }.items()
@@ -109,8 +109,10 @@ def response_fail(client_socket):
 
 def set_available():
     while not graceful_exit:
-        global available
-        available = config.max_requests_per_periodic_second
+        global client_ip_to_available
+        with client_ip_to_available_lock:
+            for client_address in client_ip_to_available.keys():
+                client_ip_to_available[client_address] = config.max_requests_per_periodic_second
         sleep(config.periodic_second)
 
 
@@ -130,8 +132,8 @@ if is_default_config:
     logger.debug(f"config argument is not proivded. default config will be used")
 else:
     logger.debug(f"got config from {args.config}")
-# this will be reset periodically in set_available()
-available = config.max_requests_per_periodic_second
+client_ip_to_available = {}
+client_ip_to_available_lock = threading.Lock()
 graceful_exit = False
 core_threads: List[threading.Thread] = []
 process_threads: Dict[int, threading.Thread] = {}
@@ -158,15 +160,21 @@ if __name__ == "__main__":
         while not graceful_exit:
             try:
                 client_socket, client_address = server_socket.accept()
-                if available > 0:
-                    available -= 1
+                client_ip = client_address[0]
+
+                if client_ip not in client_ip_to_available:
+                    with client_ip_to_available_lock:
+                        client_ip_to_available[client_ip] = config.max_requests_per_periodic_second
+                if client_ip_to_available[client_ip] > 0:
+                    with client_ip_to_available_lock:
+                        client_ip_to_available[client_ip] -= 1
                     process_thread = threading.Thread(
                         target=forward_request, args=(client_socket, client_address)
                     )
                     process_thread.start()
                     process_threads[process_thread.native_id] = process_thread
                 else:
-                    response_fail(client_socket)
+                    response_fail(client_socket, client_address)
             except GracefulExit:
                 continue
         logger.info("exit gracefully...")
