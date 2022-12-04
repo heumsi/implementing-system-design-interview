@@ -3,32 +3,16 @@ import logging
 import signal
 import socket
 import threading
-from dataclasses import dataclass
 from time import sleep
 from typing import Dict, List, Tuple
 
 import yaml
 
+from src.config import Config
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help=" : config file path")
 args = parser.parse_args()
-
-
-@dataclass
-class Config:
-    listen_host: str = "0.0.0.0"
-    listen_port: int = 8000
-    forward_host: str = "127.0.0.1"
-    forward_port: int = 8080
-    buf_size: int = 1024
-    log_level: str = "DEBUG"
-    log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    periodic_second: int = 1
-    max_requests_per_periodic_second: int = 2
-
-    @classmethod
-    def from_dict(cls, config_as_dict: Dict[str, str]):
-        return cls(**config_as_dict)
 
 
 def get_config() -> Tuple[Config, bool]:
