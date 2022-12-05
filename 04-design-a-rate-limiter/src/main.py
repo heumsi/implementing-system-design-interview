@@ -130,7 +130,7 @@ def raise_graceful_exit(*args):
 config, is_default_config = get_config()
 logger = get_logger()
 if is_default_config:
-    logger.debug(f"config argument is not proivded. default config will be used")
+    logger.debug(f"config argument is not provided. default config will be used")
 else:
     logger.debug(f"got config from {args.config}")
 client_ip_to_n_tokens = defaultdict(lambda: config.max_n_tokens_per_periodic_second)
@@ -150,11 +150,10 @@ if __name__ == "__main__":
         )
         set_config_periodically_thread.start()
         core_threads.append(set_config_periodically_thread)
+    set_n_tokens_thread = threading.Thread(target=initialize_client_ip_to_n_tokens_periodically)
+    set_n_tokens_thread.start()
+    core_threads.append(set_n_tokens_thread)
     with socket.socket() as server_socket:
-        set_n_tokens_thread = threading.Thread(target=initialize_client_ip_to_n_tokens_periodically)
-        set_n_tokens_thread.start()
-        core_threads.append(set_n_tokens_thread)
-
         server_socket.bind((config.listen_host, config.listen_port))
         server_socket.listen()
         logger.info(f"start listening on {config.listen_host}:{config.listen_port}")
