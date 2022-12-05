@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple
 
 import yaml
 
-from src.config import Config
+from src.token_bucket.config import Config
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help=" : config file path")
