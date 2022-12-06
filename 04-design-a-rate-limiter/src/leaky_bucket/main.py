@@ -1,0 +1,223 @@
+import argparse
+import logging
+import queue
+import signal
+import socket
+import threading
+from collections import defaultdict
+from time import sleep
+from typing import Dict, List, Tuple
+
+import yaml
+
+from src.leaky_bucket.config import Config
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-c", "--config", help=" : config file path")
+args = parser.parse_args()
+
+
+def get_config() -> Tuple[Config, bool]:
+    if args.config:
+        with open(args.config) as f:
+            config_as_dict = yaml.load(f, Loader=yaml.FullLoader)
+            config = Config.from_dict(config_as_dict)
+            return config, False
+    return Config(), True
+
+
+def set_config_periodically():
+    logger.debug("start to set config periodically...")
+    while not graceful_exit:
+        global config
+        config, _ = get_config()
+        logger.debug(f"got config from {args.config}")
+        sleep(1)
+
+
+def get_logger() -> logging.Logger:
+    logger = logging.getLogger()
+    logger.setLevel(config.log_level)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter(config.log_format))
+    logger.addHandler(stream_handler)
+    return logger
+
+
+def forward_request(client_socket, client_address):
+    try:
+        with socket.socket() as forward_socket:
+            data = client_socket.recv(config.buf_size)
+            decoded_data = data.decode()
+            logger.debug(
+                f"got data from client {client_address[0]}:{client_address[1]}: {decoded_data}"
+            )
+            logger.debug(
+                f"start to connect forward server {config.forward_host}:{config.forward_port}"
+            )
+            forward_socket.connect((config.forward_host, config.forward_port))
+            logger.debug(
+                f"send data to forward server {config.forward_host}:{config.forward_port}"
+            )
+            forward_socket.send(data)
+            data = forward_socket.recv(config.buf_size)
+            decoded_data = data.decode()
+            # logger.debug(
+            #     f"got data from forward server {config.forward_host}:{config.forward_port}: {decoded_data}"
+            # )
+        decoded_data_blocks = decoded_data.split("\r\n\r\n")
+        decoded_data_blocks[0] = decoded_data_blocks[0] + "\r\n" + "\r\n".join(
+            f"{k}: {v}"
+            for k, v in {
+                "X-Ratelimit-Remaining": config.max_request_queue_size - client_ip_to_request_queue[client_address[0]].qsize(),
+                "X-Ratelimit-Limit": config.max_request_queue_size,
+                "X-Ratelimit-Retry-After": config.periodic_second
+            }.items()
+        )
+        decoded_data = "\r\n\r\n".join(decoded_data_blocks)
+        data = decoded_data.encode('utf-8')
+        logger.debug(f"send data to client {client_address[0]}:{client_address[1]}")
+        client_socket.send(data)
+    finally:
+        client_socket.close()
+
+
+def respond_with_failure(client_socket, client_address):
+    try:
+        content = "Please retry after minutes"
+        header = "\n".join(
+            [
+                "HTTP/1.1 429 Too many requests",
+                "\r\n".join(
+                    f"{k}: {v}"
+                    for k, v in {
+                        "Content-Type": "text/plan; encoding=utf8",
+                        "Content-Length": len(content),
+                        "Connection": "close",
+                        "X-Ratelimit-Remaining": config.max_request_queue_size - client_ip_to_request_queue[client_address[0]].qsize(),
+                        "X-Ratelimit-Limit": config.max_request_queue_size,
+                        "X-Ratelimit-Retry-After": config.periodic_second
+                    }.items()
+                ),
+            ]
+        )
+        data = "\n\n".join([header, content])
+        logger.debug(f"send failure response to client {client_address[0]}:{client_address[1]}")
+        client_socket.send(data.encode("utf-8"))
+    finally:
+        client_socket.close()
+
+
+def clear_client_ip_to_request_queue_periodically():
+    logger.debug("start to clear each client' request queue periodically...")
+    while not graceful_exit:
+        global client_ip_to_request_queue
+        with client_ip_to_request_queue_lock:
+            for client_ip, request_queue in list(client_ip_to_request_queue.items()):
+                if request_queue.empty():
+                    logger.debug(f"{client_ip}' queue will be deleted, because it is empty.")
+                    del client_ip_to_request_queue[client_ip]
+        sleep(5)
+
+
+def process_requests(requests: list):
+    for client_socket, client_address in requests:
+        forward_request(client_socket, client_address)
+    thread_id = threading.get_native_id()
+    with process_threads_lock:
+        process_threads.pop(thread_id)
+
+
+def process_client_ip_to_request_queue_periodically():
+    logger.debug("start to process each client' request queue periodically...")
+    while not graceful_exit:
+        global client_ip_to_request_queue
+        with client_ip_to_request_queue_lock:
+            for client_ip, request_queue in client_ip_to_request_queue.items():
+                logger.debug(f"process {client_ip}' requests in queue... (# of requests in queue: {request_queue.qsize()})")
+                count = min(config.n_request_to_be_processed_per_periodic_second, request_queue.qsize())
+                requests = []
+                while count > 0:
+                    client_socket, client_address = request_queue.get_nowait()
+                    requests.append((client_socket, client_address))
+                    count -= 1
+                if requests:
+                    process_thread = threading.Thread(target=process_requests, args=(requests, ))
+                    process_thread.start()
+                    with process_threads_lock:
+                        process_threads[process_thread.native_id] = process_thread
+        sleep(config.periodic_second)
+
+
+class GracefulExit(Exception):
+    pass
+
+
+def raise_graceful_exit(*args):
+    global graceful_exit
+    graceful_exit = True
+    raise GracefulExit()
+
+
+def is_socket_connected(socket) -> bool:
+    return socket.fileno() != -1
+
+
+config, is_default_config = get_config()
+logger = get_logger()
+if is_default_config:
+    logger.debug(f"config argument is not provided. default config will be used")
+else:
+    logger.debug(f"got config from {args.config}")
+client_ip_to_request_queue = defaultdict(lambda: queue.Queue(maxsize=config.max_request_queue_size))
+client_ip_to_request_queue_lock = threading.Lock()
+graceful_exit = False
+core_threads: List[threading.Thread] = []
+process_threads: Dict[int, threading.Thread] = {}
+process_threads_lock = threading.Lock()
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, raise_graceful_exit)
+    signal.signal(signal.SIGTERM, raise_graceful_exit)
+
+    try:
+        if not is_default_config:
+            set_config_periodically_thread = threading.Thread(
+                target=set_config_periodically
+            )
+            set_config_periodically_thread.start()
+            core_threads.append(set_config_periodically_thread)
+        set_n_tokens_thread = threading.Thread(target=clear_client_ip_to_request_queue_periodically)
+        set_n_tokens_thread.start()
+        core_threads.append(set_n_tokens_thread)
+        process_client_ip_to_request_queue_thread = threading.Thread(target=process_client_ip_to_request_queue_periodically)
+        process_client_ip_to_request_queue_thread.start()
+        core_threads.append(process_client_ip_to_request_queue_thread)
+        with socket.socket() as server_socket:
+            server_socket.bind((config.listen_host, config.listen_port))
+            server_socket.listen()
+            logger.info(f"start listening on {config.listen_host}:{config.listen_port}")
+            while True:
+                try:
+                    client_socket, client_address = server_socket.accept()
+                    client_ip = client_address[0]
+                    with client_ip_to_request_queue_lock:
+                        client_ip_to_request_queue[client_ip].put_nowait((client_socket, client_address))
+                except queue.Full:
+                    respond_with_failure(client_socket, client_address)
+                except GracefulExit:
+                    if is_socket_connected(client_socket):
+                        client_socket.close()
+                    break
+    finally:
+        logger.info("exit gracefully...")
+        with process_threads_lock:
+            for thread_id, thread in process_threads.items():
+                logger.debug(f"wait process thread {thread_id}...")
+                thread.join()
+        for thread in core_threads:
+            logger.debug(f"wait core thread {thread.native_id}...")
+            thread.join()
+    logger.info("good bye!")
