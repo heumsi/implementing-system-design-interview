@@ -1,0 +1,21 @@
+from pydantic import BaseSettings
+
+
+class Config(BaseSettings):
+    class Common(BaseSettings):
+        forward_host: str = "127.0.0.1"
+        forward_port: int = 8080
+        buf_size: int = 1024
+
+    class LeakyBucket(BaseSettings):
+        periodic_second: int = 1
+        n_request_to_be_processed_per_periodic_second: int = 2
+        max_request_queue_size: int = 2
+
+    class TokenBucket(BaseSettings):
+        periodic_second: int = 1
+        max_n_tokens_per_periodic_second: int = 2
+
+    common: Common = Common()
+    leaky_bucket: LeakyBucket = LeakyBucket()
+    token_bucket: TokenBucket = TokenBucket()

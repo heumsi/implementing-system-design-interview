@@ -1,9 +1,0 @@
-listen_host: 0.0.0.0
-listen_port: 8000
-forward_host: 127.0.0.1
-forward_port: 8080
-buf_size: 1024
-log_level: DEBUG
-log_format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-periodic_second: 1
-max_n_tokens_per_periodic_second: 2
