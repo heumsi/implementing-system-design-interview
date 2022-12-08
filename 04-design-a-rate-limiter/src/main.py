@@ -9,7 +9,7 @@ from typing import Optional
 import yaml
 
 from src.config import Config
-from src.rate_limiters import RateLimiterAlgorithm
+from src.rate_limiters import RateLimitAlgorithm
 from src.rate_limiters.leaky_bucket import LeakyBucketAlgorithm
 from src.rate_limiters.token_bucket import TokenBucketAlgorithm
 from src.util import setup_logger
@@ -23,7 +23,7 @@ parser.add_argument("-p", "--port", help=" : host for listening", default="8000"
 parser.add_argument(
     "-a",
     "--algorithm",
-    help=" : algorithm for rate limiter. you can choose one among 'token bucket', 'leak_bucket'",
+    help=" : algorithm for rate limit. you can choose one among 'token bucket', 'leak bucket'",
     default="leaky bucket",
 )
 parser.add_argument(
@@ -79,7 +79,7 @@ def _register_gracefully_exit_handler() -> None:
 
 
 def _run_server(
-    listen_host: str, listen_port: int, rate_limiter_algo: RateLimiterAlgorithm
+    listen_host: str, listen_port: int, rate_limit_algo: RateLimitAlgorithm
 ) -> None:
     with socket.socket() as server_socket:
         server_socket.bind((listen_host, listen_port))
@@ -88,11 +88,10 @@ def _run_server(
         while not graceful_exit:
             try:
                 client_socket, client_address = server_socket.accept()
-                rate_limiter_algo.handle(client_socket, client_address)
+                rate_limit_algo.handle(client_socket, client_address)
             except Exception as e:
-                raise e
-            finally:
-                client_socket.close()
+                if _is_socket_connected(client_socket):
+                    client_socket.close()
 
 
 if __name__ == "__main__":
@@ -102,12 +101,19 @@ if __name__ == "__main__":
         config_manager.start()
         config = config_manager.get_config()
         if args.algorithm == "token bucket":
-            algorithm = TokenBucketAlgorithm()
+            rate_limit_algo = TokenBucketAlgorithm()
         elif args.algorithm == "leaky bucket":
-            algorithm = LeakyBucketAlgorithm(**config.leaky_bucket.dict())
+            rate_limit_algo = LeakyBucketAlgorithm(
+                periodic_second=config.leaky_bucket.periodic_second,
+                n_request_to_be_processed_per_periodic_second=config.leaky_bucket.n_request_to_be_processed_per_periodic_second,
+                max_request_queue_size=config.leaky_bucket.max_request_queue_size,
+                socket_buf_size=config.common.socket_buf_size,
+                forward_host=config.common.forward_host,
+                forward_port=config.common.forward_port,
+            )
         else:
             raise NotImplemented()
-        _run_server(args.hostname, int(args.port), algorithm)
+        _run_server(args.hostname, int(args.port), rate_limit_algo)
     except Exception as e:
         raise e
     finally:

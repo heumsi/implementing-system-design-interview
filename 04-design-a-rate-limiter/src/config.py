@@ -5,7 +5,7 @@ class Config(BaseSettings):
     class Common(BaseSettings):
         forward_host: str = "127.0.0.1"
         forward_port: int = 8080
-        buf_size: int = 1024
+        socket_buf_size: int = 1024
 
     class LeakyBucket(BaseSettings):
         periodic_second: int = 1

@@ -1,5 +1,5 @@
-from src.rate_limiters import RateLimiterAlgorithm
+from src.rate_limiters import RateLimitAlgorithm
 
 
-class TokenBucketAlgorithm(RateLimiterAlgorithm):
+class TokenBucketAlgorithm(RateLimitAlgorithm):
     pass
