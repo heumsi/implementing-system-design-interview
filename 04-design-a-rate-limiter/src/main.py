@@ -14,13 +14,24 @@ from src.rate_limiters.leaky_bucket import LeakyBucketAlgorithm
 from src.rate_limiters.token_bucket import TokenBucketAlgorithm
 from src.util import setup_logger
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help=" : config file path")
-parser.add_argument("-hn", "--hostname", help=" : hostname for listening", default="0.0.0.0")
+parser.add_argument(
+    "-hn", "--hostname", help=" : hostname for listening", default="0.0.0.0"
+)
 parser.add_argument("-p", "--port", help=" : host for listening", default="8000")
-parser.add_argument("-a", "--algorithm", help=" : algorithm for rate limiter. you can choose one among 'token bucket', 'leak_bucket'", default='leaky bucket')
-parser.add_argument("-f", "--log-format", help=" : log format", default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+parser.add_argument(
+    "-a",
+    "--algorithm",
+    help=" : algorithm for rate limiter. you can choose one among 'token bucket', 'leak_bucket'",
+    default="leaky bucket",
+)
+parser.add_argument(
+    "-f",
+    "--log-format",
+    help=" : log format",
+    default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 parser.add_argument("-v", "--verbose", help=" : for verbose log", default=False)
 args = parser.parse_args()
 
@@ -42,7 +53,6 @@ graceful_exit = False
 
 
 class ConfigManager(threading.Thread):
-
     def __init__(self, config_path: Optional[str]) -> None:
         super().__init__()
         self.config_path = config_path
@@ -68,7 +78,9 @@ def _register_gracefully_exit_handler() -> None:
     signal.signal(signal.SIGTERM, _graceful_exit_handler)
 
 
-def _run_server(listen_host: str, listen_port: int, rate_limiter_algo: RateLimiterAlgorithm) -> None:
+def _run_server(
+    listen_host: str, listen_port: int, rate_limiter_algo: RateLimiterAlgorithm
+) -> None:
     with socket.socket() as server_socket:
         server_socket.bind((listen_host, listen_port))
         server_socket.listen()
@@ -89,9 +101,9 @@ if __name__ == "__main__":
     try:
         config_manager.start()
         config = config_manager.get_config()
-        if args.algorithm == 'token bucket':
+        if args.algorithm == "token bucket":
             algorithm = TokenBucketAlgorithm()
-        elif args.algorithm == 'leaky bucket':
+        elif args.algorithm == "leaky bucket":
             algorithm = LeakyBucketAlgorithm(**config.leaky_bucket.dict())
         else:
             raise NotImplemented()
