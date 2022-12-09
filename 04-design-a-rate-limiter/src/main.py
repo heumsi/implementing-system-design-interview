@@ -32,7 +32,9 @@ parser.add_argument(
     help=" : log format",
     default="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(name)s - %(message)s",
 )
-parser.add_argument("-v", "--verbose", help=" : for verbose log", default=False)
+parser.add_argument(
+    "-v", "--verbose", action="store_true", help=" : for verbose log", default=False
+)
 args = parser.parse_args()
 
 setup_logger(args.log_format, args.verbose)
