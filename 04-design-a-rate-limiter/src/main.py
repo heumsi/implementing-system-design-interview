@@ -30,7 +30,7 @@ parser.add_argument(
     "-f",
     "--log-format",
     help=" : log format",
-    default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    default="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(name)s - %(message)s",
 )
 parser.add_argument("-v", "--verbose", help=" : for verbose log", default=False)
 args = parser.parse_args()
@@ -39,17 +39,17 @@ setup_logger(args.log_format, args.verbose)
 logger = logging.getLogger()
 
 
-def _graceful_exit_handler(*args):
-    global graceful_exit
-    graceful_exit = True
-    # raise GracefulExit()
+class GracefulExit(Exception):
+    pass
+
+
+def _raise_graceful_exit(*args):
+    logger.debug("got shutdown signal")
+    raise GracefulExit()
 
 
 def _is_socket_connected(s: socket.socket) -> bool:
     return s.fileno() != -1
-
-
-graceful_exit = False
 
 
 class ConfigManager(threading.Thread):
@@ -57,16 +57,24 @@ class ConfigManager(threading.Thread):
         super().__init__()
         self.config_path = config_path
         self._config = Config()
+        self._is_stop = False
+        self._logger = logging.getLogger(self.__class__.__name__)
 
     def run(self) -> None:
-        while self.config_path and not graceful_exit:
+        self._logger.debug("start to run")
+        while self.config_path and not self._is_stop:
             self._config = self._get_config_from_path()
             sleep(1)
+        self._logger.debug("has been completed")
 
     def get_config(self) -> Config:
         return self._config
 
+    def stop(self) -> None:
+        self._is_stop = True
+
     def _get_config_from_path(self) -> Config:
+        self._logger.debug(f"get config from {self.config_path}")
         with open(self.config_path) as f:
             config_as_dict = yaml.load(f, Loader=yaml.FullLoader)
             config = Config(**config_as_dict)
@@ -74,8 +82,8 @@ class ConfigManager(threading.Thread):
 
 
 def _register_gracefully_exit_handler() -> None:
-    signal.signal(signal.SIGINT, _graceful_exit_handler)
-    signal.signal(signal.SIGTERM, _graceful_exit_handler)
+    signal.signal(signal.SIGINT, _raise_graceful_exit)
+    signal.signal(signal.SIGTERM, _raise_graceful_exit)
 
 
 def _run_server(
@@ -85,21 +93,22 @@ def _run_server(
         server_socket.bind((listen_host, listen_port))
         server_socket.listen()
         logger.info(f"start listening on {listen_host}:{listen_port}")
-        while not graceful_exit:
+        while True:
             try:
                 client_socket, client_address = server_socket.accept()
                 rate_limit_algo.handle(client_socket, client_address)
-            except Exception as e:
+            except GracefulExit:
                 if _is_socket_connected(client_socket):
                     client_socket.close()
-                raise e
+                break
+    logger.info("server socket has been closed")
 
 
 if __name__ == "__main__":
     _register_gracefully_exit_handler()
     config_manager = ConfigManager(args.config)
+    config_manager.start()
     try:
-        config_manager.start()
         config = config_manager.get_config()
         if args.algorithm == "token bucket":
             rate_limit_algo = TokenBucketAlgorithm()
@@ -114,8 +123,11 @@ if __name__ == "__main__":
             )
         else:
             raise NotImplemented()
+        rate_limit_algo.setup()
         _run_server(args.hostname, int(args.port), rate_limit_algo)
+        rate_limit_algo.teardown()
     except Exception as e:
-        raise e
+        logger.error(e)
     finally:
-        config_manager.join()
+        config_manager.stop()
+        logger.info("good bye!")
