@@ -92,6 +92,7 @@ def _run_server(
             except Exception as e:
                 if _is_socket_connected(client_socket):
                     client_socket.close()
+                raise e
 
 
 if __name__ == "__main__":
