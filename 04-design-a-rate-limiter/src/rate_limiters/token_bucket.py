@@ -3,8 +3,7 @@ import socket
 import time
 from typing import Dict
 
-from src.core import Request
-from src.rate_limiters import RateLimitAlgorithm
+from src.core import Request, RateLimitAlgorithm
 
 
 class BucketIsEmpty(Exception):
