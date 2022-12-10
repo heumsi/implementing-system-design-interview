@@ -19,7 +19,9 @@ parser.add_argument("-c", "--config", metavar="", help="config file (.yaml) path
 parser.add_argument(
     "-hn", "--hostname", metavar="", help="hostname for listening", default="0.0.0.0"
 )
-parser.add_argument("-p", "--port", metavar="", help="port for listening", default="8000")
+parser.add_argument(
+    "-p", "--port", metavar="", help="port for listening", default="8000"
+)
 parser.add_argument(
     "-f",
     "--log-format",
@@ -107,7 +109,9 @@ def _run_server(
                 client_socket, client_address = server_socket.accept()
                 if config_manager.is_config_changed:
                     rate_limit_algo.teardown()
-                    rate_limit_algo = create_rate_limit_algorithm(config_manager.get_config())
+                    rate_limit_algo = create_rate_limit_algorithm(
+                        config_manager.get_config()
+                    )
                     rate_limit_algo.setup()
                 rate_limit_algo.handle(client_socket, client_address)
             except Exception as e:
@@ -122,7 +126,9 @@ def _run_server(
 
 
 def create_rate_limit_algorithm(config: Config) -> RateLimitAlgorithm:
-    logger.debug(f"create a rate limit algorithm of ({config.common.rate_limit_algorithm}) instance")
+    logger.debug(
+        f"create a rate limit algorithm of ({config.common.rate_limit_algorithm}) instance"
+    )
     if config.common.rate_limit_algorithm == "token bucket":
         return TokenBucketAlgorithm()
     elif config.common.rate_limit_algorithm == "leaky bucket":
@@ -134,7 +140,9 @@ def create_rate_limit_algorithm(config: Config) -> RateLimitAlgorithm:
             forward_host=config.common.forward_host,
             forward_port=config.common.forward_port,
         )
-    raise NotImplementedError(f"config.common.rate_limit_algorithm must be 'token bucket' or 'leaky bucket'. (current: {args.common.rate_limit_algorithm})")
+    raise NotImplementedError(
+        f"config.common.rate_limit_algorithm must be 'token bucket' or 'leaky bucket'. (current: {args.common.rate_limit_algorithm})"
+    )
 
 
 if __name__ == "__main__":
