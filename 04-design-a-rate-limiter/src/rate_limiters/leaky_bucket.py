@@ -3,21 +3,10 @@ import queue
 import socket
 import threading
 import time
-from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict
 
+from src.core import Request
 from src.rate_limiters import RateLimitAlgorithm
-
-
-@dataclass
-class _Request:
-    client_socket: socket.socket
-    client_ip: str
-    client_port: str
-
-    @property
-    def client_address(self) -> str:
-        return f"{self.client_ip}:{self.client_port}"
 
 
 class RequestQueueIsFull(Exception):
@@ -79,7 +68,7 @@ class _RequestProcessor(threading.Thread):
                     f"current [# of requests / queue size] in queue is [{count}/{self._request_queue_size}]"
                 )
                 for i in range(1, count + 1):
-                    request: _Request = self._request_queue.get_nowait()
+                    request: Request = self._request_queue.get_nowait()
                     self._logger.debug(
                         f"process request of {request.client_address} in queue [{i}/{count}]"
                     )
@@ -87,7 +76,7 @@ class _RequestProcessor(threading.Thread):
             time.sleep(self._periodic_second)
         self._logger.debug("will be terminated.")
 
-    def add_request(self, request: _Request) -> None:
+    def add_request(self, request: Request) -> None:
         try:
             self._request_queue.put_nowait(request)
             self._logger.info(
@@ -102,7 +91,7 @@ class _RequestProcessor(threading.Thread):
     def stop(self) -> None:
         self.is_stop = True
 
-    def _forward_request(self, request: _Request) -> None:
+    def _forward_request(self, request: Request) -> None:
         try:
             with socket.socket() as forward_socket:
                 data = request.client_socket.recv(self._socket_buf_size)
@@ -202,21 +191,18 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
             request_processor.join()
             self._logger.debug("will be terminated")
 
-    def handle(
-        self, client_socket: socket.socket, client_address: Tuple[str, str]
-    ) -> None:
-        client_ip, client_port = client_address
-        request = _Request(
-            client_socket=client_socket, client_ip=client_ip, client_port=client_port
-        )
+    def handle(self, request: Request) -> None:
+
         self._logger.debug(f"handle request of {request.client_address}")
-        request_processor = self._client_ip_to_request_processor.get(client_ip, None)
+        request_processor = self._client_ip_to_request_processor.get(
+            request.client_ip, None
+        )
         if not request_processor:
             self._logger.debug(
                 f"_RequestProcessor for {request.client_ip} has not been created yet. create thread"
             )
             request_processor = _RequestProcessor(
-                client_ip=client_ip,
+                client_ip=request.client_ip,
                 periodic_second=self._periodic_second,
                 n_request_to_be_processed_per_periodic_second=self._n_request_to_be_processed_per_periodic_second,
                 request_queue_size=self._request_queue_size,
@@ -224,7 +210,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                 forward_host=self._forward_host,
                 forward_port=self._forward_port,
             )
-            self._client_ip_to_request_processor[client_ip] = request_processor
+            self._client_ip_to_request_processor[request.client_ip] = request_processor
         if not request_processor.has_been_started:
             self._logger.debug(
                 f"_RequestProcessor for {request.client_ip} has not been started yet. start the thread"
@@ -235,7 +221,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                 f"_RequestProcessor for {request.client_ip} has been stop. create and start new thread"
             )
             request_processor = _RequestProcessor(
-                client_ip=client_ip,
+                client_ip=request.client_ip,
                 periodic_second=self._periodic_second,
                 n_request_to_be_processed_per_periodic_second=self._n_request_to_be_processed_per_periodic_second,
                 request_queue_size=self._request_queue_size,
@@ -243,14 +229,14 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                 forward_host=self._forward_host,
                 forward_port=self._forward_port,
             )
-            self._client_ip_to_request_processor[client_ip] = request_processor
+            self._client_ip_to_request_processor[request.client_ip] = request_processor
             request_processor.start()
         try:
             request_processor.add_request(request)
         except RequestQueueIsFull:
             self._respond_with_failure(request, request_processor.request_queue_size)
 
-    def _respond_with_failure(self, request: _Request, request_queue_size: int) -> None:
+    def _respond_with_failure(self, request: Request, request_queue_size: int) -> None:
         try:
             content = "Please retry after minutes"
             header = "\n".join(

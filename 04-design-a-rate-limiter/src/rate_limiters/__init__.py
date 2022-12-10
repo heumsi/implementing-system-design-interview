@@ -1,6 +1,6 @@
 import abc
-import socket
-from typing import Tuple
+
+from src.core import Request
 
 
 class RateLimitAlgorithm(abc.ABC):
@@ -9,9 +9,7 @@ class RateLimitAlgorithm(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def handle(
-        self, client_socket: socket.socket, client_address: Tuple[str, str]
-    ) -> None:
+    def handle(self, request: Request) -> None:
         pass
 
     @abc.abstractmethod

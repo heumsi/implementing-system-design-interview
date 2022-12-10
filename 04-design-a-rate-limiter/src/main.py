@@ -9,6 +9,7 @@ from typing import Optional
 import yaml
 
 from src.config import Config
+from src.core import Request
 from src.rate_limiters import RateLimitAlgorithm
 from src.rate_limiters.leaky_bucket import LeakyBucketAlgorithm
 from src.rate_limiters.token_bucket import TokenBucketAlgorithm
@@ -113,7 +114,13 @@ def _run_server(
                         config_manager.get_config()
                     )
                     rate_limit_algo.setup()
-                rate_limit_algo.handle(client_socket, client_address)
+                client_ip, client_port = client_address
+                request = Request(
+                    client_socket=client_socket,
+                    client_ip=client_ip,
+                    client_port=client_port,
+                )
+                rate_limit_algo.handle(request)
             except Exception as e:
                 if _is_socket_connected(client_socket):
                     client_socket.close()
@@ -127,11 +134,18 @@ def _run_server(
 
 def create_rate_limit_algorithm(config: Config) -> RateLimitAlgorithm:
     logger.debug(
-        f"create a rate limit algorithm of ({config.common.rate_limit_algorithm}) instance"
+        f"create a rate limit algorithm of ({config.rate_limit_algorithm}) instance"
     )
-    if config.common.rate_limit_algorithm == "token bucket":
-        return TokenBucketAlgorithm()
-    elif config.common.rate_limit_algorithm == "leaky bucket":
+    if config.rate_limit_algorithm == "token bucket":
+        return TokenBucketAlgorithm(
+            periodic_second=config.token_bucket.periodic_second,
+            n_tokens_to_be_added_per_periodic_second=config.token_bucket.n_tokens_to_be_added_per_periodic_second,
+            token_bucket_size=config.token_bucket.token_bucket_size,
+            socket_buf_size=config.common.socket_buf_size,
+            forward_host=config.common.forward_host,
+            forward_port=config.common.forward_port,
+        )
+    elif config.rate_limit_algorithm == "leaky bucket":
         return LeakyBucketAlgorithm(
             periodic_second=config.leaky_bucket.periodic_second,
             n_request_to_be_processed_per_periodic_second=config.leaky_bucket.n_request_to_be_processed_per_periodic_second,
@@ -141,7 +155,7 @@ def create_rate_limit_algorithm(config: Config) -> RateLimitAlgorithm:
             forward_port=config.common.forward_port,
         )
     raise NotImplementedError(
-        f"config.common.rate_limit_algorithm must be 'token bucket' or 'leaky bucket'. (current: {args.common.rate_limit_algorithm})"
+        f"config.rate_limit_algorithm must be 'token bucket' or 'leaky bucket'. (current: {args.rate_limit_algorithm})"
     )
 
 
