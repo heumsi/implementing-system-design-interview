@@ -3,13 +3,16 @@ import socket
 
 from src.config import Config
 from src.config_manager import ConfigManager
-from src.core import Request, RateLimitAlgorithm, GracefulExit
+from src.core import GracefulExit, Request
+from src.rate_limiters import RateLimitAlgorithm
 from src.rate_limiters.leaky_bucket import LeakyBucketAlgorithm
 from src.rate_limiters.token_bucket import TokenBucketAlgorithm
 
 
 class Server:
-    def __init__(self, listen_host: str, listen_port: str, config_manager: ConfigManager) -> None:
+    def __init__(
+        self, listen_host: str, listen_port: str, config_manager: ConfigManager
+    ) -> None:
         self._listen_host = listen_host
         self._listen_port = listen_port
         self._config_manager = config_manager
@@ -24,7 +27,9 @@ class Server:
             server_socket.bind((self._listen_host, int(self._listen_port)))
             server_socket.listen()
             self._logger.info(f"start listening on {self.listen_address}")
-            rate_limit_algo = self._create_rate_limit_algorithm(self._config_manager.get_config())
+            rate_limit_algo = self._create_rate_limit_algorithm(
+                self._config_manager.get_config()
+            )
             rate_limit_algo.setup()
             while True:
                 try:

@@ -3,7 +3,8 @@ import socket
 import time
 from typing import Dict
 
-from src.core import Request, RateLimitAlgorithm
+from src.core import Request
+from src.rate_limiters import RateLimitAlgorithm
 
 
 class BucketIsEmpty(Exception):
@@ -40,7 +41,9 @@ class TokenBucket:
             self.current_n_tokens = min(
                 self.current_n_tokens + n_tokens_to_be_added, self._token_bucket_size
             )
-            self._logger.debug(f"{n_tokens_to_be_added} tokens has been added. current # of tokens is {self.current_n_tokens}")
+            self._logger.debug(
+                f"{n_tokens_to_be_added} tokens has been added. current # of tokens is {self.current_n_tokens}"
+            )
         if self.current_n_tokens <= 0:
             raise BucketIsEmpty()
         self.current_n_tokens -= 1
@@ -75,7 +78,9 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
         self._logger.debug(f"handle request of {request.client_address}")
         token_bucket = self._client_ip_to_token_bucket.get(request.client_ip, None)
         if not token_bucket:
-            self._logger.debug(f"token bucket of {request.client_ip} has not been created yet. create token bucket")
+            self._logger.debug(
+                f"token bucket of {request.client_ip} has not been created yet. create token bucket"
+            )
             token_bucket = TokenBucket(
                 client_ip=request.client_ip,
                 periodic_second=self._periodic_second,
@@ -85,7 +90,9 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
             self._client_ip_to_token_bucket[request.client_ip] = token_bucket
         try:
             token_bucket.get_token()
-            self._logger.info(f"get token successfully. current [# of tokens / bucket size] is [{token_bucket.current_n_tokens}/{self._token_bucket_size}]")
+            self._logger.info(
+                f"get token successfully. current [# of tokens / bucket size] is [{token_bucket.current_n_tokens}/{self._token_bucket_size}]"
+            )
             self._forward_request(request, token_bucket)
         except BucketIsEmpty:
             self._logger.info(

@@ -1,4 +1,3 @@
-import abc
 import socket
 from dataclasses import dataclass
 
@@ -21,20 +20,6 @@ class Request:
     @property
     def client_address(self) -> str:
         return f"{self.client_ip}:{self.client_port}"
-
-
-class RateLimitAlgorithm(abc.ABC):
-    @abc.abstractmethod
-    def setup(self) -> None:
-        pass
-
-    @abc.abstractmethod
-    def handle(self, request: Request) -> None:
-        pass
-
-    @abc.abstractmethod
-    def teardown(self) -> None:
-        pass
 
 
 class GracefulExit(Exception):
