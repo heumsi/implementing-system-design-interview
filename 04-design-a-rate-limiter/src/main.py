@@ -15,19 +15,20 @@ from src.rate_limiters.token_bucket import TokenBucketAlgorithm
 from src.util import setup_logger
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help=" : config file path")
+parser.add_argument("-c", "--config", metavar="", help="config file (.yaml) path")
 parser.add_argument(
-    "-hn", "--hostname", help=" : hostname for listening", default="0.0.0.0"
+    "-hn", "--hostname", metavar="", help="hostname for listening", default="0.0.0.0"
 )
-parser.add_argument("-p", "--port", help=" : host for listening", default="8000")
+parser.add_argument("-p", "--port", metavar="", help="port for listening", default="8000")
 parser.add_argument(
     "-f",
     "--log-format",
-    help=" : log format",
+    metavar="",
+    help="log format",
     default="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(name)s - %(message)s",
 )
 parser.add_argument(
-    "-v", "--verbose", action="store_true", help=" : for verbose log", default=False
+    "-v", "--verbose", action="store_true", help="print debug logs", default=False
 )
 args = parser.parse_args()
 
