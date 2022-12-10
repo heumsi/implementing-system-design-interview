@@ -4,5 +4,5 @@ common:
   socket_buf_size: 1024
 leaky_bucket:
   periodic_second: 1
-  n_request_to_be_processed_per_periodic_second: 2
-  max_request_queue_size: 2
+  n_request_to_be_processed_per_periodic_second: 5
+  max_request_queue_size: 5

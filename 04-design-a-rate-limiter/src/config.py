@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseSettings
 
 
@@ -6,6 +8,7 @@ class Config(BaseSettings):
         forward_host: str = "127.0.0.1"
         forward_port: int = 8080
         socket_buf_size: int = 1024
+        rate_limit_algorithm: Literal["token bucket", "leaky bucket"] = "leaky bucket"
 
     class LeakyBucket(BaseSettings):
         periodic_second: int = 1

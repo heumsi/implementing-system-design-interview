@@ -200,6 +200,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
             )
             request_processor.stop()
             request_processor.join()
+            self._logger.debug("will be terminated")
 
     def handle(
         self, client_socket: socket.socket, client_address: Tuple[str, str]
