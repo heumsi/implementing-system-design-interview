@@ -2,13 +2,13 @@ common:
   forward_host: 127.0.0.1
   forward_port: 8080
   socket_buf_size: 1024
-#rate_limit_algorithm: token bucket
-rate_limit_algorithm: leaky bucket
+rate_limit_algorithm: token bucket
+#rate_limit_algorithm: leaky bucket
 leaky_bucket:
   periodic_second: 0.1
   n_request_to_be_processed_per_periodic_second: 5
   request_queue_size: 5
 token_bucket:
-  periodic_second: 10
+  periodic_second: 1
   n_tokens_to_be_added_per_periodic_second: 1
   token_bucket_size: 5

@@ -86,10 +86,10 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
             self._client_ip_to_token_bucket[request.client_ip] = token_bucket
         try:
             token_bucket.get_token()
-            self._logger.debug(f"get token successfully. current [# of tokens / bucket size] is [{token_bucket.current_n_tokens} / {self._token_bucket_size}]")
+            self._logger.info(f"get token successfully. current [# of tokens / bucket size] is [{token_bucket.current_n_tokens}/{self._token_bucket_size}]")
             self._forward_request(request, token_bucket)
         except BucketIsEmpty:
-            self._logger.debug(
+            self._logger.info(
                 f"token bucket is emtpy. can not forward request from {request.client_address}"
             )
             self._respond_with_failure(request)
@@ -144,7 +144,7 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
                 ]
             )
             data = "\n\n".join([header, content])
-            self._logger.debug(
+            self._logger.error(
                 f"send failure response to client {request.client_address}"
             )
             request.client_socket.send(data.encode("utf-8"))
@@ -171,7 +171,7 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
                 ]
             )
             data = "\n\n".join([header, content])
-            self._logger.debug(
+            self._logger.info(
                 f"send failure response to client {request.client_address}"
             )
             request.client_socket.send(data.encode("utf-8"))

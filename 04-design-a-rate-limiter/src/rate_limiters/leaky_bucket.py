@@ -63,12 +63,12 @@ class _RequestProcessor(threading.Thread):
                     )
                     self.is_stop = True
             else:
-                self._logger.debug(
-                    f"current [# of requests / queue size] in queue is [{count}/{self._request_queue_size}]"
+                self._logger.info(
+                    f"process requests in queue. current [# of requests / queue size] in queue is [{count}/{self._request_queue_size}]"
                 )
                 for i in range(1, count + 1):
                     request: Request = self._request_queue.get_nowait()
-                    self._logger.debug(
+                    self._logger.info(
                         f"process request of {request.client_address} in queue [{i}/{count}]"
                     )
                     self._forward_request(request)
@@ -254,7 +254,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                 ]
             )
             data = "\n\n".join([header, content])
-            self._logger.debug(
+            self._logger.info(
                 f"send failure response to client {request.client_address}"
             )
             request.client_socket.send(data.encode("utf-8"))
