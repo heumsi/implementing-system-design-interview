@@ -135,7 +135,7 @@ def create_rate_limit_algorithm(config: Config) -> RateLimitAlgorithm:
         return LeakyBucketAlgorithm(
             periodic_second=config.leaky_bucket.periodic_second,
             n_request_to_be_processed_per_periodic_second=config.leaky_bucket.n_request_to_be_processed_per_periodic_second,
-            max_request_queue_size=config.leaky_bucket.max_request_queue_size,
+            request_queue_size=config.leaky_bucket.request_queue_size,
             socket_buf_size=config.common.socket_buf_size,
             forward_host=config.common.forward_host,
             forward_port=config.common.forward_port,

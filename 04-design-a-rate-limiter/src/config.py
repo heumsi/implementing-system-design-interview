@@ -13,7 +13,7 @@ class Config(BaseSettings):
     class LeakyBucket(BaseSettings):
         periodic_second: int = 1
         n_request_to_be_processed_per_periodic_second: int = 2
-        max_request_queue_size: int = 2
+        request_queue_size: int = 2
 
     class TokenBucket(BaseSettings):
         periodic_second: int = 1

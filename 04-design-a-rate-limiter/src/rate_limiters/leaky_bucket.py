@@ -30,7 +30,7 @@ class _RequestProcessor(threading.Thread):
         client_ip: str,
         periodic_second: int,
         n_request_to_be_processed_per_periodic_second: int,
-        max_request_queue_size: int,
+        request_queue_size: int,
         socket_buf_size: int,
         forward_host: str,
         forward_port: str,
@@ -44,13 +44,13 @@ class _RequestProcessor(threading.Thread):
         self._n_request_to_be_processed_per_periodic_second = (
             n_request_to_be_processed_per_periodic_second
         )
-        self._max_request_queue_size = max_request_queue_size
+        self._request_queue_size = request_queue_size
         self._socket_buf_size = socket_buf_size
         self._forward_host = forward_host
         self._forward_port = forward_port
         self._empty_count = 0
         self._empty_count_threshold_for_stop = 10
-        self._request_queue = queue.Queue(self._max_request_queue_size)
+        self._request_queue = queue.Queue(self._request_queue_size)
         self._logger = logging.getLogger(
             f"{self.__class__.__name__} ({self._client_ip})"
         )
@@ -76,7 +76,7 @@ class _RequestProcessor(threading.Thread):
             else:
                 self._empty_count = 0
                 self._logger.debug(
-                    f"current [# of requests / queue size] in queue is [{count}/{self._max_request_queue_size}]"
+                    f"current [# of requests / queue size] in queue is [{count}/{self._request_queue_size}]"
                 )
                 for i in range(1, count + 1):
                     request: _Request = self._request_queue.get_nowait()
@@ -91,7 +91,7 @@ class _RequestProcessor(threading.Thread):
         try:
             self._request_queue.put_nowait(request)
             self._logger.info(
-                f"request from {request.client_address} has been added to queue. current [# of requests / queue_size] in queue is [{self._request_queue.qsize()}/{self._max_request_queue_size}]"
+                f"request from {request.client_address} has been added to queue. current [# of requests / queue_size] in queue is [{self._request_queue.qsize()}/{self._request_queue_size}]"
             )
         except queue.Full:
             self._logger.info(
@@ -126,9 +126,9 @@ class _RequestProcessor(threading.Thread):
                 + "\r\n".join(
                     f"{k}: {v}"
                     for k, v in {
-                        "X-Ratelimit-Remaining": self._max_request_queue_size
+                        "X-Ratelimit-Remaining": self._request_queue_size
                         - self._request_queue.qsize(),
-                        "X-Ratelimit-Limit": self._max_request_queue_size,
+                        "X-Ratelimit-Limit": self._request_queue_size,
                         "X-Ratelimit-Retry-After": self._periodic_second,
                     }.items()
                 )
@@ -148,9 +148,9 @@ class _RequestProcessor(threading.Thread):
                             "Content-Type": "text/plan; encoding=utf8",
                             "Content-Length": len(content),
                             "Connection": "close",
-                            "X-Ratelimit-Remaining": self._max_request_queue_size
+                            "X-Ratelimit-Remaining": self._request_queue_size
                             - self.request_queue_size,
-                            "X-Ratelimit-Limit": self._max_request_queue_size,
+                            "X-Ratelimit-Limit": self._request_queue_size,
                             "X-Ratelimit-Retry-After": self._periodic_second,
                         }.items()
                     ),
@@ -170,7 +170,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
         self,
         periodic_second: int,
         n_request_to_be_processed_per_periodic_second: int,
-        max_request_queue_size: int,
+        request_queue_size: int,
         socket_buf_size: int,
         forward_host: str,
         forward_port: str,
@@ -179,7 +179,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
         self._n_request_to_be_processed_per_periodic_second = (
             n_request_to_be_processed_per_periodic_second
         )
-        self._max_request_queue_size = max_request_queue_size
+        self._request_queue_size = request_queue_size
         self._socket_buf_size = socket_buf_size
         self._forward_host = forward_host
         self._forward_port = forward_port
@@ -219,7 +219,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                 client_ip=client_ip,
                 periodic_second=self._periodic_second,
                 n_request_to_be_processed_per_periodic_second=self._n_request_to_be_processed_per_periodic_second,
-                max_request_queue_size=self._max_request_queue_size,
+                request_queue_size=self._request_queue_size,
                 socket_buf_size=self._socket_buf_size,
                 forward_host=self._forward_host,
                 forward_port=self._forward_port,
@@ -238,7 +238,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                 client_ip=client_ip,
                 periodic_second=self._periodic_second,
                 n_request_to_be_processed_per_periodic_second=self._n_request_to_be_processed_per_periodic_second,
-                max_request_queue_size=self._max_request_queue_size,
+                request_queue_size=self._request_queue_size,
                 socket_buf_size=self._socket_buf_size,
                 forward_host=self._forward_host,
                 forward_port=self._forward_port,
@@ -262,9 +262,9 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
                             "Content-Type": "text/plan; encoding=utf8",
                             "Content-Length": len(content),
                             "Connection": "close",
-                            "X-Ratelimit-Remaining": self._max_request_queue_size
+                            "X-Ratelimit-Remaining": self._request_queue_size
                             - request_queue_size,
-                            "X-Ratelimit-Limit": self._max_request_queue_size,
+                            "X-Ratelimit-Limit": self._request_queue_size,
                             "X-Ratelimit-Retry-After": self._periodic_second,
                         }.items()
                     ),
