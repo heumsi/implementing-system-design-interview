@@ -6,7 +6,7 @@ import time
 from typing import Dict
 
 from src.core import Request
-from src.rate_limiters import RateLimitAlgorithm
+from src.rate_limit_algorithms import RateLimitAlgorithm
 
 
 class RequestQueueIsFull(Exception):

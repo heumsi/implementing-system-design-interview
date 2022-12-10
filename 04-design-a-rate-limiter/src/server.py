@@ -4,9 +4,9 @@ import socket
 from src.config import Config
 from src.config_manager import ConfigManager
 from src.core import GracefulExit, Request
-from src.rate_limiters import RateLimitAlgorithm
-from src.rate_limiters.leaky_bucket import LeakyBucketAlgorithm
-from src.rate_limiters.token_bucket import TokenBucketAlgorithm
+from src.rate_limit_algorithms import RateLimitAlgorithm
+from src.rate_limit_algorithms.leaky_bucket import LeakyBucketAlgorithm
+from src.rate_limit_algorithms.token_bucket import TokenBucketAlgorithm
 
 
 class Server:
