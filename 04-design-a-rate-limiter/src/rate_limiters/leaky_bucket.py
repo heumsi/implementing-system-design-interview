@@ -37,15 +37,15 @@ class _RequestProcessor(threading.Thread):
         self._socket_buf_size = socket_buf_size
         self._forward_host = forward_host
         self._forward_port = forward_port
-        self._empty_count = 0
-        self._empty_count_threshold_for_stop = 10
+        self._last_ts = int(time.time())
+        self._idle_threshold_second = 10
         self._request_queue = queue.Queue(self._request_queue_size)
         self._logger = logging.getLogger(
             f"{self.__class__.__name__} ({self._client_ip})"
         )
 
     @property
-    def request_queue_size(self) -> int:
+    def current_n_requests(self) -> int:
         return self._request_queue.qsize()
 
     def run(self) -> None:
@@ -56,14 +56,13 @@ class _RequestProcessor(threading.Thread):
                 self._request_queue.qsize(),
             )
             if count == 0:
-                self._empty_count += 1
-                self._logger.debug(
-                    f"queue is empty. If the queue is empty {self._empty_count_threshold_for_stop - self._empty_count} more times, this thread will be terminated. "
-                )
-                if self._empty_count >= self._empty_count_threshold_for_stop:
+                current_ts = int(time.time())
+                if current_ts - self._last_ts >= self._idle_threshold_second:
+                    self._logger.debug(
+                        f"queue is empty during {current_ts - self._last_ts}s. stop the loop"
+                    )
                     self.is_stop = True
             else:
-                self._empty_count = 0
                 self._logger.debug(
                     f"current [# of requests / queue size] in queue is [{count}/{self._request_queue_size}]"
                 )
@@ -73,6 +72,7 @@ class _RequestProcessor(threading.Thread):
                         f"process request of {request.client_address} in queue [{i}/{count}]"
                     )
                     self._forward_request(request)
+                self._last_ts = int(time.time())
             time.sleep(self._periodic_second)
         self._logger.debug("will be terminated.")
 
@@ -126,7 +126,7 @@ class _RequestProcessor(threading.Thread):
             data = decoded_data.encode("utf-8")
             self._logger.debug(f"send data to client {request.client_address}")
             request.client_socket.send(data)
-        except ConnectionRefusedError as e:
+        except ConnectionRefusedError:
             content = f"Connection was refused. Make sure the forward server is running on {self._forward_host}:{self._forward_port}"
             header = "\n".join(
                 [
@@ -137,8 +137,7 @@ class _RequestProcessor(threading.Thread):
                             "Content-Type": "text/plan; encoding=utf8",
                             "Content-Length": len(content),
                             "Connection": "close",
-                            "X-Ratelimit-Remaining": self._request_queue_size
-                            - self.request_queue_size,
+                            "X-Ratelimit-Remaining": 0,
                             "X-Ratelimit-Limit": self._request_queue_size,
                             "X-Ratelimit-Retry-After": self._periodic_second,
                         }.items()
@@ -172,7 +171,6 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
         self._socket_buf_size = socket_buf_size
         self._forward_host = forward_host
         self._forward_port = forward_port
-
         self._client_ip_to_request_processor: Dict[str, _RequestProcessor] = {}
         self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -192,7 +190,6 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
             self._logger.debug("will be terminated")
 
     def handle(self, request: Request) -> None:
-
         self._logger.debug(f"handle request of {request.client_address}")
         request_processor = self._client_ip_to_request_processor.get(
             request.client_ip, None
@@ -234,7 +231,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
         try:
             request_processor.add_request(request)
         except RequestQueueIsFull:
-            self._respond_with_failure(request, request_processor.request_queue_size)
+            self._respond_with_failure(request, request_processor.current_n_requests)
 
     def _respond_with_failure(self, request: Request, request_queue_size: int) -> None:
         try:

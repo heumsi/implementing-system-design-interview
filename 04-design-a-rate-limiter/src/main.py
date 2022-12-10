@@ -128,7 +128,6 @@ def _run_server(
                 if e.__class__ == GracefulExit:
                     break
                 raise e
-
     logger.info("server socket has been closed")
 
 
