@@ -3,7 +3,6 @@ import queue
 import socket
 import threading
 import time
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
@@ -21,10 +20,11 @@ class _Request:
         return f"{self.client_ip}:{self.client_port}"
 
 
-class _RequestProcessor(threading.Thread):
-    class RequestQueueIsFull(Exception):
-        pass
+class RequestQueueIsFull(Exception):
+    pass
 
+
+class _RequestProcessor(threading.Thread):
     def __init__(
         self,
         client_ip: str,
@@ -57,7 +57,7 @@ class _RequestProcessor(threading.Thread):
 
     @property
     def request_queue_size(self) -> int:
-        return self._request_queue.queue
+        return self._request_queue.qsize()
 
     def run(self) -> None:
         self.has_been_started = True
@@ -75,6 +75,9 @@ class _RequestProcessor(threading.Thread):
                     self.is_stop = True
             else:
                 self._empty_count = 0
+                self._logger.debug(
+                    f"current [# of requests / queue size] in queue is [{count}/{self._max_request_queue_size}]"
+                )
                 for i in range(1, count + 1):
                     request: _Request = self._request_queue.get_nowait()
                     self._logger.debug(
@@ -87,11 +90,14 @@ class _RequestProcessor(threading.Thread):
     def add_request(self, request: _Request) -> None:
         try:
             self._request_queue.put_nowait(request)
-            self._logger.debug(
-                f"request from {request.client_address} has been added to queue"
+            self._logger.info(
+                f"request from {request.client_address} has been added to queue. current [# of requests / queue_size] in queue is [{self._request_queue.qsize()}/{self._max_request_queue_size}]"
             )
         except queue.Full:
-            raise self.RequestQueueIsFull()
+            self._logger.info(
+                f"reqeust queue is full. request from {request.client_address} has not been added to queue"
+            )
+            raise RequestQueueIsFull()
 
     def stop(self) -> None:
         self.is_stop = True
@@ -240,7 +246,7 @@ class LeakyBucketAlgorithm(RateLimitAlgorithm):
             request_processor.start()
         try:
             request_processor.add_request(request)
-        except _RequestProcessor.RequestQueueIsFull:
+        except RequestQueueIsFull:
             self._respond_with_failure(request, request_processor.request_queue_size)
 
     def _respond_with_failure(self, request: _Request, request_queue_size: int) -> None:

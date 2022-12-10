@@ -58,7 +58,8 @@ class ConfigManager(threading.Thread):
     def __init__(self, config_path: Optional[str]) -> None:
         super().__init__()
         self.config_path = config_path
-        self._config = Config()
+
+        self._config = self._get_config_from_path() if config_path else Config()
         self._is_stop = False
         self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -112,6 +113,7 @@ if __name__ == "__main__":
     config_manager.start()
     try:
         config = config_manager.get_config()
+        logger.info(config)
         if args.algorithm == "token bucket":
             rate_limit_algo = TokenBucketAlgorithm()
         elif args.algorithm == "leaky bucket":
@@ -128,8 +130,6 @@ if __name__ == "__main__":
         rate_limit_algo.setup()
         _run_server(args.hostname, int(args.port), rate_limit_algo)
         rate_limit_algo.teardown()
-    except Exception as e:
-        logger.error(e)
     finally:
         config_manager.stop()
         logger.info("good bye!")
