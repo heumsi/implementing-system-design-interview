@@ -1,8 +1,8 @@
-from locust import HttpUser, task, constant
+from locust import HttpUser, constant, task
 
 
 class User(HttpUser):
-    wait_time = constant(1)
+    wait_time = constant(10)
 
     @task
     def index(self):
