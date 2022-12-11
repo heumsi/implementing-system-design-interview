@@ -1,0 +1,50 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: pycln
+        name: pycln
+        stages: [ commit ]
+        types: [python]
+        language: system
+        entry: pycln
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        stages: [ commit ]
+        types: [python]
+        language: system
+        entry: black
+  - repo: local
+    hooks:
+      - id: isort
+        name: isort
+        stages: [ commit ]
+        types: [python]
+        language: system
+        entry: isort
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        stages: [ push ]
+        types: [python]
+        language: system
+        entry: pytest
+        pass_filenames: false
+        always_run: true
+  - repo: local
+    hooks:
+      - id: commitizen
+        name: commitizen check
+        stages: [ commit-msg ]
+        language: system
+        entry: cz check
+        args:
+          - --allow-abort
+          - --commit-msg-file
