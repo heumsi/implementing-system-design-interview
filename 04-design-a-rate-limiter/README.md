@@ -215,7 +215,7 @@ A reverse proxy server for rate limiter.
 
 ```mermaid
 graph LR
-    subgraph this project
+    subgraph This project
         p[proxy server for rate limit]
     end
     c[client] <--> p
@@ -231,7 +231,9 @@ and this proxy server forwards it to the original server if there is no problem 
 graph LR
     subgraph Process
         s[Server]
-        cm[Config Manager]
+        subgraph Thread
+            cm[Config Manager]
+        end
         rla[Rate Limit Algorithm]
     end
 
@@ -250,20 +252,25 @@ graph LR
     s -- "5. Create or get instance" --> rla
     s -- "6. Handle" --> rla
     rla -- "7. Request if rate limit success" ---> fs -. "8. Response" .-> rla
-    rla -. "7. Failed response if rate limit failed" -.-> c
+    rla -. "7'. Failed response if rate limit failed" -.-> c
     rla -. "9. Successful response " -.-> c
 ```
 
 The workflow is as follows.
 
+```
 1. When the app is started, the Config Manager is first started as a thread, and config.yaml is read periodically, created as a Config instance, and saved.
    If config.yaml is not passed as a parameter, the default Config instance is used, and config.yaml is not read periodically.
 2. The client makes an HTTP request to the server.
-3-4. After checking whether the Config value has changed from the Config Manager, the server receives the most recent Config instance.
-5-6. Based on the Config instance, a Rate Limit Algorithm instance is created to process the request.
-7. At this time, if the request is allowed by the Rate Limit Algorithm, the request is sent back to the Forward Server.
-   On the other hand, if the request is not allowed by the Rate Limit Algorithm, it responds with 429 code to the client.
-8-9. If the forward server responds successfully, the response is sent back to the client as is.
+3. After checking whether the Config value has changed from the Config Manager, Server makes a request to the Config Manager for Config
+4. Config Manager return the most recent Config instance to Server.
+5. Based on the Config instance, a Rate Limit Algorithm is created to process the request.
+6. Server asks the Rate Limit Algorithm to handle the request.
+7. If the request is allowed by the Rate Limit Algorithm, the request is sent back to the Forward Server.
+   If the request is not allowed by the Rate Limit Algorithm, Server responds with 429 code to the client. (Workflow Ends)
+8. If the forward Server responds successfully, the response is sent back to the Server
+9. Server sent back successful response to Client
+```
 
 ### Details
 
@@ -296,6 +303,7 @@ graph LR
         fs[Forward Server]
     end
     subgraph Process
+        direction LR
         s[Server]
         tba[Token Bucket Algorithm]
         tb[Token Bucket]
@@ -306,12 +314,15 @@ graph LR
     tba -- "3. Get Token" --> tb
     tb -. "4. Decrease # of tokens, if bucket is not empty" .-> tb
     tb -. "4'. Raise Exception, if bucket is empty" .-> tba
-    tb -. "5'. Failed response" .-> c
+    tba -. "5'. Failed response" .-> c
     tba -- "5. Request" --> fs
     fs -. "6. Response" .-> tba
     tba -. "7. Response" .-> c
 ```
 
+A description of the workflow follows.
+
+```
 1. The Server requests the Token Bucket Algorithm to process the request.
 2. Token Bucket Algorithm manages Token Bucket as an internal variable. Get if exist or create this if not exist yet.
 3. Request a token from the imported Token Bucket.
@@ -323,6 +334,7 @@ The next is when the Bucket is not empty.
 4. Token Bucket decreases the number of tokens in the Bucket by one.
 5-6. Token Bucket Algorithm sends a request to the Forward Server and receives a response.
 7. Token Bucket Algorithm sends a response to the client.
+```
 
 The next is when the Bucket is empty.
 
@@ -347,36 +359,37 @@ graph LR
     end
 
     s -- "1. Handle" --> lba
-    lba -. "2. Get or Create Request Processor" .-> lba
-    lba -- "3. Add Request" --> rp
-    rp -. "4. Add Request in Internal Queue, if queue is not full" .-> rp
-    rp -. "5. Get Reqeusts from Internal Queue periodically" ..-> rp
-    rp -- "6. Request" --> fs
-    fs -. "7. Response" .-> rp
-    rp -. "8. Response" .-> c
+    lba -. "2. Get or Create Request Processor and Request Queue" .-> lba
+    lba -- "3. Put Request into Request Queue" --> lba
+    rp -. "4. Get Reqeusts periodically" .-> rp
+    rp -- "5. Request" --> fs
+    fs -. "6. Response" .-> rp
+    rp -. "7. Response" .-> c
 
 
-    rp -. "4'. Raise Exception, if queue is full" .-> lba
+    rp -. "4'. Raise Exception, if Queue is full" .-> lba
     rp -. "5'. Failed response" .-> c
 ```
+A description of the workflow follows.
 
+```
 1. The Server requests the Leaky Bucket Algorithm to process the request.
-2. Token Bucket Algorithm manages Request Processor which contain request queue and process requests in queue as an internal variable. Get if exist or create this if not exist yet.
-3. The Token Bucket Algorithm requests the Request Processor to add a request to the queue.
+2. Token Bucket Algorithm manages Request Processor and Request Queue as an internal variables. Get if exist or create these if not exist yet.
+3. The Token Bucket Algorithm try to put the request into Request Queue.
 
 After this, depending on the case, it proceeds in two ways.
 
 The next is when the queue is not in full state.
 
-4. The Request Processor adds the request to an internal queue.
-5. The Request Processor periodically pulls requests out of the internal queue.
-6-7. Request Processor sends out requests to Forward Server and receives responses.
-8. Request Processor sends a response to the Client.
+4. The Request Processor periodically pulls requests out of the internal queue.
+5-6. Request Processor sends out requests to Forward Server and receives responses.
+7. Request Processor sends a response to the Client.
 
 The next is when the queue is in full state.
 
 4'. Throw an exception that the queue is full.
 5'. Request Processors sends a 429 response to the Client.
+```
 
 ### Limitations
 
