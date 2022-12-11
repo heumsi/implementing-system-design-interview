@@ -6,7 +6,7 @@
 
 Implement a rate limiter from Chapter 4.
 
-## Requirements
+### Requirements
 
 - Must implement at least one of the following rate limit algorithms:
   - Token bucket
