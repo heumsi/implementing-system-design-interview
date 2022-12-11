@@ -96,18 +96,18 @@ options:
 Dynamic config values can be changed while the app is running, and the app parses config.yaml every 3 seconds by default to check for changes.
 The values contained in `config.yaml` is as follows.
 
-| Name                                                       | Description                                                                                                  | Default Value |
-|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------|
-| common.forward_host                                        | Host of forwarding server                                                                                    | 127.0.0.1     |
-| common.forward_port                                        | Port of forwarding server                                                                                    | 8080          |
-| common.socket_buf_size                                     | Socker buffer size used for listening client and forwarding server                                           | 1024          |
-| rate_limit_algorithm                                       | Rate limit algorithm to use. <br>You can choose one of the followings<br>- "token bucket"<br>-"leack bucket" | token bucket  |
-| token_bucket.periodic_second                               | Time period (second) for putting tokens in buckets                                                           | 1             |
-| token_bucket.n_tokens_to_be_added_per_periodic_second      | The number of tokens to bucket in a time period                                                              | 2             |
-| token_bucket.token_bucket_size                             | Bucket size. Responds with 429 when the number of requests exceeds this queue.                               | 2             |
-| leaky_bucket.periodic_second                               | Time period (second) for pulling requests from the queue and processing them                                 | 1             |
-| leaky_bucket.n_request_to_be_processed_per_periodic_second | Number of requests to be dequeued per periodic_second                                                        | 2             |
-| leaky_bucket.request_queue_size                            | Size of the queue. Responds with 429 when the number of requests exceeds this queue.                         | 2             |
+| Name                                                       | Description                                                                                               | Default Value |
+|------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|
+| common.forward_host                                        | Host of forwarding server                                                                                 | 127.0.0.1     |
+| common.forward_port                                        | Port of forwarding server                                                                                 | 8080          |
+| common.socket_buf_size                                     | Socker buffer size used for listening client and forwarding server                                        | 1024          |
+| rate_limit_algorithm                                       | Rate limit algorithm to use. <br>You can choose one of the followings<br>- token bucket<br>- leaky bucket | token bucket  |
+| token_bucket.periodic_second                               | Time period (second) for putting tokens in buckets                                                        | 1             |
+| token_bucket.n_tokens_to_be_added_per_periodic_second      | The number of tokens to bucket in a time period                                                           | 2             |
+| token_bucket.token_bucket_size                             | Bucket size. Responds with 429 when the number of requests exceeds this queue.                            | 2             |
+| leaky_bucket.periodic_second                               | Time period (second) for pulling requests from the queue and processing them                              | 1             |
+| leaky_bucket.n_request_to_be_processed_per_periodic_second | Number of requests to be dequeued per periodic_second                                                     | 2             |
+| leaky_bucket.request_queue_size                            | Size of the queue. Responds with 429 when the number of requests exceeds this queue.                      | 2             |
 
 If you use a `leaky bucket` as the `rate_limit_algorithm`, you don't have to worry about the values related to the `token bucket`.
 The opposite is also true.
@@ -151,6 +151,7 @@ Now, if the client sends an HTTP request to this rate limit server as follows, y
 
 ```bash
 # when request succeed.
+
 $ curl -v http://localhost:8000
 
 *   Trying 127.0.0.1:8000...
@@ -182,6 +183,7 @@ $ curl -v http://localhost:8000
 
 ```bash
 # when request failed.
+
 $ curl -v http://localhost:8000
 
 *   Trying 127.0.0.1:8000...
