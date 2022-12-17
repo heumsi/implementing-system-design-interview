@@ -3,7 +3,7 @@ from statistics import mean
 from faker import Faker
 
 
-def test_ContentHash가_잘_동작하는지_테스트한다():
+def test_content_hash_do_successfully():
     n_test = 100
     n_diffs = []
     fake = Faker()
@@ -27,7 +27,10 @@ def test_ContentHash가_잘_동작하는지_테스트한다():
 
         n_diff = 0  # 재배치(rehashing)된 수
         for key in initial_data:
-            if initial_key_to_node_index[key] != after_added_node_key_to_node_index[key]:
+            if (
+                initial_key_to_node_index[key]
+                != after_added_node_key_to_node_index[key]
+            ):
                 n_diff += 1
         n_diffs.append(n_diff)
 
