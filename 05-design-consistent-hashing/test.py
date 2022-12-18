@@ -1,5 +1,6 @@
 from statistics import mean
 
+from consistent_hash import ConsistentHash, Node
 from faker import Faker
 
 
@@ -12,25 +13,26 @@ def test_content_hash_do_successfully():
     for _ in range(n_test):
         consistent_hash = ConsistentHash(
             hash_algorithm="sha",
-            n_node_indexes=3,  # 0보다 커야함.
+            nodes=[
+                Node(id=1),
+                Node(id=2),
+                Node(id=3),
+            ],
         )
-        initial_key_to_node_index = {}
+        initial_key_to_node = {}
         for key in initial_data:
-            node_index = consistent_hash.get_node_index_by_key(key)
-            initial_key_to_node_index[key] = node_index
+            node = consistent_hash.get_node_of_key(key)
+            initial_key_to_node[key] = node
 
-        consistent_hash.add_node()  # 추가와 동시에 재배치도 끝나야 함.
-        after_added_node_key_to_node_index = {}
+        consistent_hash.add_node(Node(id=4))  # 추가와 동시에 재배치도 끝나야 함.
+        after_key_to_node = {}
         for key in initial_data:
-            node_index = consistent_hash.get_node_index_by_key(key)
-            after_added_node_key_to_node_index[key] = node_index
+            node = consistent_hash.get_node_of_key(key)
+            after_key_to_node[key] = node
 
         n_diff = 0  # 재배치(rehashing)된 수
         for key in initial_data:
-            if (
-                initial_key_to_node_index[key]
-                != after_added_node_key_to_node_index[key]
-            ):
+            if initial_key_to_node[key] != after_key_to_node[key]:
                 n_diff += 1
         n_diffs.append(n_diff)
 
