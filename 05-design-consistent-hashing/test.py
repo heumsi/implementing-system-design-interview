@@ -4,19 +4,40 @@ from consistent_hash import ConsistentHash, Node
 from faker import Faker
 
 
+def test_get_node_of_key_successfully():
+    # given
+    consistent_hash = ConsistentHash(
+        nodes=[
+            Node(id="1"),
+            Node(id="2"),
+            Node(id="3"),
+        ],
+    )
+    faker = Faker()
+
+    n_data = 10
+    for _ in range(n_data):
+
+        # when
+        key = faker.email()
+        node = consistent_hash.get_node_of_key(key)
+
+        # then
+        assert node.id in ["1", "2", "3"]
+
+
 def test_content_hash_do_successfully():
     n_test = 100
     n_diffs = []
-    fake = Faker()
+    faker = Faker()
     n_data = 10
-    initial_data = [fake.email() for _ in range(n_data)]
+    initial_data = [faker.email() for _ in range(n_data)]
     for _ in range(n_test):
         consistent_hash = ConsistentHash(
-            hash_algorithm="sha",
             nodes=[
-                Node(id=1),
-                Node(id=2),
-                Node(id=3),
+                Node(id="1"),
+                Node(id="2"),
+                Node(id="3"),
             ],
         )
         initial_key_to_node = {}
@@ -24,7 +45,7 @@ def test_content_hash_do_successfully():
             node = consistent_hash.get_node_of_key(key)
             initial_key_to_node[key] = node
 
-        consistent_hash.add_node(Node(id=4))  # 추가와 동시에 재배치도 끝나야 함.
+        consistent_hash.add_node(Node(id="4"))  # 추가와 동시에 재배치도 끝나야 함.
         after_key_to_node = {}
         for key in initial_data:
             node = consistent_hash.get_node_of_key(key)
