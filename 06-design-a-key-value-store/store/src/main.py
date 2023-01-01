@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response, status
 from pydantic import BaseModel, HttpUrl
-from requests import post
+from requests import get, post
 from src.config import Config
 
 parser = ArgumentParser()
@@ -115,6 +115,20 @@ def add_peer_by_external(request: AddPeerByExternalRequest):
 @app.get("/peers")
 def get_peers():
     return {"peers": list(peer_urls)}
+
+
+@app.get("/peers/healthcheck")
+def healthcheck_peers():
+    peer_url_to_result = {}
+    for peer_url in peer_urls:
+        response = get(
+            urljoin(peer_url, "/healthcheck"),
+        )
+        if response.status_code == status.HTTP_200_OK:
+            peer_url_to_result[peer_url] = "success"
+        else:
+            peer_url_to_result[peer_url] = "failure"
+    return peer_url_to_result
 
 
 if __name__ == "__main__":

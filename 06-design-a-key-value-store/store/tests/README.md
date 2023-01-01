@@ -43,3 +43,21 @@ curl localhost:8888/peers
  curl localhost:9999/peers
 {"peers":["http://0.0.0.0:8888","http://0.0.0.0:7777"]}
 ```
+
+## Healthcheck peers
+
+### Given
+
+Same as given and when of "Add peers" test.
+
+### When
+
+```bash
+curl localhost:8888/peers/healthcheck
+```
+
+### Then
+
+```bash
+{"http://0.0.0.0:9999":"success","http://0.0.0.0:7777":"success"}
+```
