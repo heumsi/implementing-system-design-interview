@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response, status
 from pydantic import BaseModel, HttpUrl
-from requests import get, post
+from requests import get, post, put
 from src.config import Config
 
 parser = ArgumentParser()
@@ -39,16 +39,40 @@ def get_item(key: str):
 
 
 class PutItemRequest(BaseModel):
+    key: str
     value: Any
 
 
-@app.put("/items/{key}")
-def put_item(key: str, request: PutItemRequest, response: Response):
+@app.put("/_items")
+def put_item_by_internal(request: PutItemRequest, response: Response):
     response.status_code = status.HTTP_201_CREATED
-    if data.get(key):
+    if data.get(request.key):
         response.status_code = status.HTTP_200_OK
-    data[key] = request.value
-    return {"value": data[key]}
+    data[request.key] = request.value
+    return {"key": request.key, "value": data[request.key]}
+
+
+@app.put("/items")
+def put_item_by_external(request: PutItemRequest, response: Response):
+    response.status_code = status.HTTP_201_CREATED
+    if data.get(request.key):
+        response.status_code = status.HTTP_200_OK
+    data[request.key] = request.value
+    for peer_url in peer_urls:
+        response = put(
+            urljoin(str(peer_url), url="/_items"),
+            json=PutItemRequest(
+                key=request.key,
+                value=request.value,
+            ).dict(),
+        )
+        if response.status_code not in (status.HTTP_200_OK, status.HTTP_201_CREATED):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something was wrong",
+            )
+        # TODO: All exception handling must be considered better
+    return {"key": request.key, "value": data[request.key]}
 
 
 class AddPeersByInternalRequest(BaseModel):

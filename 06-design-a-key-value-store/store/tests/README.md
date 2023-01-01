@@ -61,3 +61,32 @@ curl localhost:8888/peers/healthcheck
 ```bash
 {"http://0.0.0.0:9999":"success","http://0.0.0.0:7777":"success"}
 ```
+
+## Put item
+
+### Given
+
+Same as given and when of "Add peers" test.
+
+### When
+
+```
+curl -X PUT 0.0.0.0:8888/items -H "Content-Type: application/json" -d '{"key":"foo", "value": "bar"}'
+```
+
+### Then
+
+```
+{"key", "foo", value":"bar"}
+```
+
+```
+curl 0.0.0.0:8888/items/foo
+{"value":"bar"}
+
+curl 0.0.0.0:7777/items/foo
+{"value":"bar"}
+
+curl 0.0.0.0:9999/items/foo
+{"value":"bar"}
+```
