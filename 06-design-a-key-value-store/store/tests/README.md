@@ -1,0 +1,45 @@
+# Tests
+
+Tests that are difficult to write in test code will be written in this document.
+
+## Add peers
+
+### Given
+
+```bash
+export PYTHONPATH=.
+export PORT=7777
+python src/main.py
+```
+
+```bash
+export PYTHONPATH=.
+export PORT=8888
+python src/main.py
+```
+
+```bash
+export PYTHONPATH=.
+export PORT=9999
+python src/main.py
+```
+
+### When
+
+```bash
+curl -X POST localhost:8888/peers -H "Content-Type: application/json" -d '{"peer_url":"http://0.0.0.0:7777"}'
+curl -X POST localhost:8888/peers -H "Content-Type: application/json" -d '{"peer_url":"http://0.0.0.0:9999"}'
+```
+
+### Then
+
+```bash
+curl localhost:7777/peers
+{"peers":["http://0.0.0.0:9999","http://0.0.0.0:8888"]}
+
+curl localhost:8888/peers
+{"peers":["http://0.0.0.0:7777","http://0.0.0.0:9999"]}
+
+ curl localhost:9999/peers
+{"peers":["http://0.0.0.0:8888","http://0.0.0.0:7777"]}
+```
