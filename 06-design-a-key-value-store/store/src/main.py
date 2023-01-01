@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from typing import Any, List
+from typing import Any, Dict, List
 from urllib.parse import urljoin
 
 import uvicorn
@@ -19,7 +19,7 @@ else:
 
 app = FastAPI()
 
-data = {}
+items = {}
 peer_urls = set()
 
 
@@ -30,7 +30,7 @@ def healthcheck():
 
 @app.get("/items/{key}")
 def get_item(key: str):
-    value = data.get(key)
+    value = items.get(key)
     if not value:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
@@ -46,18 +46,18 @@ class PutItemRequest(BaseModel):
 @app.put("/_items")
 def put_item_by_internal(request: PutItemRequest, response: Response):
     response.status_code = status.HTTP_201_CREATED
-    if data.get(request.key):
+    if items.get(request.key):
         response.status_code = status.HTTP_200_OK
-    data[request.key] = request.value
-    return {"key": request.key, "value": data[request.key]}
+    items[request.key] = request.value
+    return {"key": request.key, "value": items[request.key]}
 
 
 @app.put("/items")
 def put_item_by_external(request: PutItemRequest, response: Response):
     response.status_code = status.HTTP_201_CREATED
-    if data.get(request.key):
+    if items.get(request.key):
         response.status_code = status.HTTP_200_OK
-    data[request.key] = request.value
+    items[request.key] = request.value
     for peer_url in peer_urls:
         response = put(
             urljoin(str(peer_url), url="/_items"),
@@ -72,7 +72,19 @@ def put_item_by_external(request: PutItemRequest, response: Response):
                 detail="Something was wrong",
             )
         # TODO: All exception handling must be considered better
-    return {"key": request.key, "value": data[request.key]}
+    return {"key": request.key, "value": items[request.key]}
+
+
+class InitializeItemsRequest(BaseModel):
+    items: Dict[str, Any]
+
+
+@app.post("/_items/initialize")
+def initialize_items(request: InitializeItemsRequest):
+    # TODO: Consideration should be given to the case of large sizes.
+    global items
+    items = request.items
+    return {"message": "Items have been initialized successfully."}
 
 
 class AddPeersByInternalRequest(BaseModel):
@@ -128,10 +140,23 @@ def add_peer_by_external(request: AddPeerByExternalRequest):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something was wrong",
             )
-    # TODO: All exception handling must be considered better
+
+    # Request initialization items to the peer in request
+    response = post(
+        urljoin(str(request.peer_url), url="/_items/initialize"),
+        json=InitializeItemsRequest(items=items).dict(),
+    )
+    if response.status_code != status.HTTP_200_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something was wrong",
+        )
+    # TODO: Consideration should be given to the case of large sizes.
 
     # Add the peer in request into my peer list
     peer_urls.add(request.peer_url)
+
+    # TODO: All exception handling must be considered better
 
     return {"message": "The peer has been successfully added."}
 
