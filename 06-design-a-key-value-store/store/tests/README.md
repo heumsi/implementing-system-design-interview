@@ -62,16 +62,40 @@ curl localhost:8888/peers/healthcheck
 {"http://0.0.0.0:9999":"success","http://0.0.0.0:7777":"success"}
 ```
 
-## 3. When you add an item to a node, it is also added to that node's peers.
+## 3. When you put an item to a node, it is also put to that node's peers as many nodes as the number of n_copy.
 
 ### Given
 
-Same as given and when of first test.
+```bash
+export PYTHONPATH=.
+export PORT=7777
+export N_COPY=2
+python src/main.py
+```
+
+```bash
+export PYTHONPATH=.
+export PORT=8888
+export N_COPY=2
+python src/main.py
+```
+
+```bash
+export PYTHONPATH=.
+export PORT=9999
+export N_COPY=2
+python src/main.py
+```
+
+```bash
+curl -X POST localhost:8888/peers -H "Content-Type: application/json" -d '{"peer_url":"http://0.0.0.0:7777"}'
+curl -X POST localhost:8888/peers -H "Content-Type: application/json" -d '{"peer_url":"http://0.0.0.0:9999"}'
+```
 
 ### When
 
 ```bash
-curl -X PUT 0.0.0.0:8888/items -H "Content-Type: application/json" -d '{"key":"foo", "value": "bar"}'
+curl -X PUT 0.0.0.0:8888/items/foo -H "Content-Type: application/json" -d '{"value": "bar"}'
 ```
 
 ### Then
@@ -81,42 +105,12 @@ curl -X PUT 0.0.0.0:8888/items -H "Content-Type: application/json" -d '{"key":"f
 ```
 
 ```bash
-curl 0.0.0.0:8888/items/foo
-{"value":"bar"}
-
 curl 0.0.0.0:7777/items/foo
 {"value":"bar"}
 
-curl 0.0.0.0:9999/items/foo
+curl 0.0.0.0:8888/items/foo
 {"value":"bar"}
-```
 
-## 4. When a peer is added to a node, the peer's items are initialized with the node's items.
-
-### Given
-
-Same as given and when of third test.
-And add the following situation.
-
-```bash
-export PYTHONPATH=.
-export PORT=6666
-python src/main.py
-```
-
-### When
-
-```bash
-curl -X POST localhost:8888/peers -H "Content-Type: application/json" -d '{"peer_url":"http://0.0.0.0:6666"}'
-```
-
-### Then
-
-```bash
-{"message":"The peer has been successfully added."}
-```
-
-```bash
-curl 0.0.0.0:6666/items/foo
+curl 0.0.0.0:9999/items/foo
 {"value":"bar"}
 ```

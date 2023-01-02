@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
+
 from src.api import private, public
 from src.global_vars import config
 
@@ -19,6 +20,8 @@ def create_app() -> FastAPI:
     return app
 
 
+app = create_app()
+
+
 if __name__ == "__main__":
-    app = create_app()
-    uvicorn.run(app, host=config.host, port=config.port)
+    uvicorn.run("main:app", host=config.host, port=config.port, workers=1)

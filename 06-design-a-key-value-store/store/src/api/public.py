@@ -4,10 +4,11 @@ from urllib.parse import urljoin
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 from requests import get, post, put
-from src.api.private import AddPeersRequest, InitializeItemsRequest
-from src.global_vars import config, items, peer_urls
 from starlette import status
-from starlette.responses import Response
+
+from src.api.private import AddPeersRequest
+from src.core.consistent_hash import Node
+from src.global_vars import config, consistent_hash, peer_urls
 
 router = APIRouter(tags=["public"])
 
@@ -19,12 +20,36 @@ def healthcheck():
 
 @router.get("/items/{key}")
 def get_item(key: str):
-    value = items.get(key)
-    if not value:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
+    # Get nodes to request to put item
+    nodes = consistent_hash.get_nodes_of_key(key, n_nodes=config.n_copy)
+
+    # Get value of key from the nodes
+    values = set()
+    for node in nodes:
+        url = node.id
+        response = get(
+            urljoin(str(url), url=f"/_items/{key}"),
         )
-    return {"value": value}
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
+            )
+        if response.status_code != status.HTTP_200_OK:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something was wrong",
+            )
+        value = response.json()["value"]
+        values.add(value)
+
+    # Check all values are same
+    if len(values) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something was wrong",
+        )
+
+    return {"value": next(iter(values))}
 
 
 class PutItemRequest(BaseModel):
@@ -32,14 +57,16 @@ class PutItemRequest(BaseModel):
 
 
 @router.put("/items/{key}")
-def put_item(key: str, request: PutItemRequest, response: Response):
-    response.status_code = status.HTTP_201_CREATED
-    if items.get(key):
-        response.status_code = status.HTTP_200_OK
-    items[key] = request.value
-    for peer_url in peer_urls:
+def put_item(key: str, request: PutItemRequest):
+    # Get nodes to request to put item
+    nodes = consistent_hash.get_nodes_of_key(key, n_nodes=config.n_copy)
+
+    # Request the nodes to to put item
+    # TODO: HTTP Request should be performed asynchronously.
+    for node in nodes:
+        url = node.id
         response = put(
-            urljoin(str(peer_url), url=f"/_items/{key}"),
+            urljoin(str(url), url=f"/_items/{key}"),
             json=PutItemRequest(
                 value=request.value,
             ).dict(),
@@ -50,7 +77,7 @@ def put_item(key: str, request: PutItemRequest, response: Response):
                 detail="Something was wrong",
             )
         # TODO: All exception handling must be considered better
-    return {"key": key, "value": items[key]}
+    return {"key": key, "value": request.value}
 
 
 class AddPeerRequest(BaseModel):
@@ -94,21 +121,24 @@ def add_peer(request: AddPeerRequest):
             )
 
     # Request initialization items to the peer in request
-    response = post(
-        urljoin(str(request.peer_url), url="/_items/initialize"),
-        json=InitializeItemsRequest(items=items).dict(),
-    )
-    if response.status_code != status.HTTP_200_OK:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Something was wrong",
-        )
+    # response = post(
+    #     urljoin(str(request.peer_url), url="/_items/initialize"),
+    #     json=InitializeItemsRequest(items=items).dict(),
+    # )
+    # if response.status_code != status.HTTP_200_OK:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         detail="Something was wrong",
+    #     )
     # TODO: Consideration should be given to the case of large sizes.
 
     # Add the peer in request into my peer list
     peer_urls.add(request.peer_url)
 
     # TODO: All exception handling must be considered better
+
+    # Add the peer in request into my consistent hash
+    consistent_hash.add_node(node=Node(id=request.peer_url))
 
     return {"message": "The peer has been successfully added."}
 

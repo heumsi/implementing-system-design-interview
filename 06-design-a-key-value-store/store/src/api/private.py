@@ -1,12 +1,24 @@
 from typing import Any, Dict, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
-from src.global_vars import peer_urls
 from starlette import status
 from starlette.responses import Response
 
+from src.core.consistent_hash import Node
+from src.global_vars import consistent_hash, items, peer_urls
+
 router = APIRouter(tags=["private"])
+
+
+@router.get("/_items/{key}")
+def get_item(key: str):
+    value = items.get(key)
+    if not value:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
+        )
+    return {"value": value}
 
 
 class PutItemRequest(BaseModel):
@@ -26,12 +38,12 @@ class InitializeItemsRequest(BaseModel):
     items: Dict[str, Any]
 
 
-@router.post("/_items/initialize")
-def initialize_items(request: InitializeItemsRequest):
-    # TODO: Consideration should be given to the case of large sizes.
-    global items
-    items = request.items
-    return {"message": "Items have been initialized successfully."}
+# @router.post("/_items/initialize")
+# def initialize_items(request: InitializeItemsRequest):
+#     # TODO: Consideration should be given to the case of large sizes.
+#     global items
+#     items = request.items
+#     return {"message": "Items have been initialized successfully."}
 
 
 class AddPeersRequest(BaseModel):
@@ -42,5 +54,6 @@ class AddPeersRequest(BaseModel):
 def add_peers(request: AddPeersRequest):
     for peer_url in request.peer_urls:
         peer_urls.add(peer_url)
+        consistent_hash.add_node(node=Node(id=peer_url))
 
     return {"message": "The peers have been successfully added."}
