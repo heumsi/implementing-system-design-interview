@@ -18,6 +18,13 @@ def healthcheck():
     return {"message": "I'm alive"}
 
 
+# TODO: 노드가 추가될 때, 기존 노드들에서 데이터가 이동해야 함.
+# 두 가지 작업이 이뤄져아할거 같음.
+# 1. 기존 노드에서 데이터를 새 노드로 bulk put 한다.
+# 2. 기존 노드에서 데이터를 삭제한다.
+# 3. peer list에 노드를 추가한다.
+
+
 @router.get("/items/{key}")
 def get_item(key: str):
     # Get nodes to request to put item
