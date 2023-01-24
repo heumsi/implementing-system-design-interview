@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "06-design-a-unique-id-generator-in-distributed-systems"
+version = "0.1.0"
+description = ""
+authors = ["heumsi <heumsi@naver.com>"]
+readme = "README.md"
+packages = [{include = "06_design_a_unique_id_generator_in_distributed_systems"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
